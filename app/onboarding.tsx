@@ -21,7 +21,7 @@ interface OnboardingSlide {
   title: string;
   description: string;
   heroBgImage: any;
-  phoneMockupImage: any;
+  phoneMockupImage?: any;
 }
 
 const SLIDES: OnboardingSlide[] = [
@@ -29,29 +29,32 @@ const SLIDES: OnboardingSlide[] = [
     id: '1',
     title: 'LA PREMIÈRE PLATEFORME\nDE MOBILITÉ INTELLIGENTE',
     description: 'pensée pour simplifier vos déplacements\nà abidjan.',
-    heroBgImage: require('@/assets/images/bridge-bg.png'),
+    heroBgImage: require('@/assets/images/bridge-bg.jpg'),
     phoneMockupImage: require('@/assets/images/sira-app-mockup.png'),
   },
   {
     id: '2',
-    title: 'CALCULEZ VOS ITINÉRAIRES\nEN TEMPS RÉEL',
-    description: 'trouvez le meilleur moyen de transport\nrapidement et sereinement.',
-    heroBgImage: require('@/assets/images/bridge-bg.png'),
-    phoneMockupImage: require('@/assets/images/sira-app-mockup.png'),
+    title: "TROUVEZ L'ITINÉRAIRE\nQUI VOUS CONVIENT",
+    description: 'Sira analyse les conditions de circulation\npour vous proposer des itinéraires\nadaptés à votre situation.',
+    heroBgImage: require('@/assets/images/slide2-bg.jpg'),
   },
   {
     id: '3',
-    title: 'SUIVEZ VOS TRANSPORTS\nET TRAJETS EN DIRECT',
-    description: 'gagnez un temps précieux sur tous\nvos trajets quotidiens.',
-    heroBgImage: require('@/assets/images/bridge-bg.png'),
-    phoneMockupImage: require('@/assets/images/sira-app-mockup.png'),
+    title: 'CHOISISSEZ VOTRE FAÇON\nDE VOUS DÉPLACER',
+    description: 'comparez les différentes options de transport\ndisponibles pour choisir celle qui correspond\nle mieux à votre trajet.',
+    heroBgImage: require('@/assets/images/slide3-bg.jpg'),
   },
   {
     id: '4',
-    title: 'VOS DESTINATIONS ET FAVORIS\nEN UN CLIC',
-    description: 'enregistrez vos lieux fréquents pour\ny accéder instantanément.',
-    heroBgImage: require('@/assets/images/bridge-bg.png'),
-    phoneMockupImage: require('@/assets/images/sira-app-mockup.png'),
+    title: 'ANTICIPEZ VOTRE TRAJET',
+    description: 'estimez le temps et le coût de\nvotre déplacement avant de prendre la route.',
+    heroBgImage: require('@/assets/images/slide4-bg.jpg'),
+  },
+  {
+    id: '5',
+    title: 'RESTEZ INFORMÉ\nEN TEMPS RÉEL',
+    description: 'recevez des informations sur les perturbations,\nles incidents et les conditions de circulation\nsur votre trajet.',
+    heroBgImage: require('@/assets/images/slide5-bg.jpg'),
   },
 ];
 
@@ -68,30 +71,43 @@ export default function OnboardingScreen() {
     }
   };
 
-  const handleNavigate = () => {
-    router.replace('/(tabs)');
+  const handleBack = () => {
+    router.replace('/');
+  };
+
+  const handleGoToSignup = () => {
+    router.push('/signup');
+  };
+
+  const handleGoToLogin = () => {
+    router.push('/login');
   };
 
   const renderSlide = ({ item }: { item: OnboardingSlide }) => {
     return (
       <View style={styles.slide}>
-        {/* Layer 1: Background Bridge Image showcasing top pylon & highway road */}
+        {/* Layer 1: Background Image */}
         <Image
           source={item.heroBgImage}
           style={styles.heroBgImage}
           contentFit="cover"
-          contentPosition={{ top: '10%', left: '28%' }}
+          contentPosition={item.phoneMockupImage ? { top: '0%', left: '46%' } : 'center'}
         />
         <View style={styles.heroOverlayGradient} />
 
-        {/* Layer 2: iPhone Mockup matching exact Designer tilt (14.5deg) and right position */}
-        <View style={styles.phoneMockupContainer}>
-          <Image
-            source={item.phoneMockupImage}
-            style={styles.phoneMockupImage}
-            contentFit="contain"
-          />
-        </View>
+        {/* Layer 2: Black bottom card backdrop */}
+        <View style={styles.slideBottomBackdrop} />
+
+        {/* Layer 3: Phone Mockup on Slide 1 - Rendered in FRONT of the black background */}
+        {item.phoneMockupImage && (
+          <View style={styles.phoneMockupContainer}>
+            <Image
+              source={item.phoneMockupImage}
+              style={styles.phoneMockupImage}
+              contentFit="contain"
+            />
+          </View>
+        )}
       </View>
     );
   };
@@ -104,7 +120,7 @@ export default function OnboardingScreen() {
       <SafeAreaView style={styles.topBar}>
         <TouchableOpacity
           style={styles.backButton}
-          onPress={handleNavigate}
+          onPress={handleBack}
           activeOpacity={0.8}
         >
           <Text style={styles.backArrowText}>←</Text>
@@ -126,9 +142,9 @@ export default function OnboardingScreen() {
         style={styles.flatList}
       />
 
-      {/* Layer 3: Bottom Sheet Dark Card (Positioned at 33% height, matching Designer mockup) */}
-      <View style={styles.bottomCard}>
-        {/* Progress Bar (Orange Bar + 3 White Dots) */}
+      {/* Layer 5: Bottom Sheet UI Content */}
+      <View style={styles.bottomCardContent} pointerEvents="box-none">
+        {/* Progress Bar (Orange Bar + 4 White Dots) */}
         <View style={styles.progressRow}>
           {SLIDES.map((_, index) => {
             const isActive = index === currentIndex;
@@ -154,11 +170,11 @@ export default function OnboardingScreen() {
           {SLIDES[currentIndex].description}
         </Text>
 
-        {/* Actions Row: S'INSCRIRE & J'ai déjà un compte. SE CONNECTER on ONE SINGLE LINE */}
+        {/* Actions Row: S'INSCRIRE & J'ai déjà un compte. SE CONNECTER */}
         <View style={styles.actionsRow}>
           <TouchableOpacity
             style={styles.registerButton}
-            onPress={handleNavigate}
+            onPress={handleGoToSignup}
             activeOpacity={0.85}
           >
             <Text style={styles.registerButtonText}>S'INSCRIRE</Text>
@@ -166,7 +182,7 @@ export default function OnboardingScreen() {
 
           <TouchableOpacity
             style={styles.loginButton}
-            onPress={handleNavigate}
+            onPress={handleGoToLogin}
             activeOpacity={0.7}
           >
             <Text style={styles.loginPrefixText} numberOfLines={1}>
@@ -192,10 +208,10 @@ const styles = StyleSheet.create({
     zIndex: 50,
   },
   backButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#000000',
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -212,44 +228,60 @@ const styles = StyleSheet.create({
     width: width,
     height: height,
     position: 'relative',
+    overflow: 'hidden',
   },
 
-  /* Layer 1: Background Bridge Image */
+  /* Layer 1: Background Image */
   heroBgImage: {
     width: '100%',
-    height: height * 0.70,
+    height: height * 0.72,
   },
   heroOverlayGradient: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
-    height: height * 0.70,
-    backgroundColor: 'rgba(0, 0, 0, 0.04)',
+    height: height * 0.72,
+    backgroundColor: 'rgba(0, 0, 0, 0.02)',
   },
 
-  /* Layer 2: Phone Mockup tilted at 14.5deg & positioned exactly as designer reference */
+  /* Layer 2: Slide Bottom Black Backdrop */
+  slideBottomBackdrop: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: height * 0.32,
+    backgroundColor: '#000000',
+    zIndex: 5,
+  },
+
+  /* Layer 3: Phone Mockup in FRONT of black backdrop */
   phoneMockupContainer: {
     position: 'absolute',
-    right: -width * 0.12,
-    top: height * 0.16,
-    width: width * 0.80,
-    height: height * 0.63,
-    transform: [{ rotate: '14.5deg' }],
-    zIndex: 12,
+    right: -width * 0.17,
+    top: height * 0.13,
+    width: width * 0.74,
+    height: height * 0.64,
+    transform: [{ rotate: '13.5deg' }],
+    zIndex: 15,
+    shadowColor: '#000000',
+    shadowOffset: { width: -6, height: 10 },
+    shadowOpacity: 0.45,
+    shadowRadius: 16,
+    elevation: 12,
   },
   phoneMockupImage: {
     width: '100%',
     height: '100%',
   },
 
-  /* Layer 3: Bottom Sheet Dark Card starting at bottom 33% height */
-  bottomCard: {
+  /* Layer 4: Bottom Sheet UI Content */
+  bottomCardContent: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: '#000000',
     paddingHorizontal: 20,
     paddingTop: 18,
     paddingBottom: 38,
@@ -264,20 +296,20 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   progressPill: {
-    height: 6,
-    borderRadius: 3,
+    height: 5,
+    borderRadius: 2.5,
   },
   progressPillActive: {
-    width: 48,
+    width: 44,
     backgroundColor: '#F26522',
   },
   progressPillInactive: {
-    width: 6,
+    width: 5,
     backgroundColor: '#FFFFFF',
     opacity: 0.95,
   },
 
-  /* Title: Heavy Uppercase Font on 2 lines */
+  /* Title: Heavy Uppercase Font */
   titleText: {
     color: '#FFFFFF',
     fontSize: 21,
@@ -297,7 +329,7 @@ const styles = StyleSheet.create({
     marginBottom: 22,
   },
 
-  /* Actions Row: Fits S'INSCRIRE & J'ai déjà un compte. SE CONNECTER on ONE SINGLE LINE */
+  /* Actions Row */
   actionsRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -305,9 +337,9 @@ const styles = StyleSheet.create({
   },
   registerButton: {
     backgroundColor: '#F26522',
-    paddingHorizontal: 18,
-    paddingVertical: 11,
-    borderRadius: 18,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 20,
   },
   registerButtonText: {
     color: '#FFFFFF',
@@ -321,8 +353,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   loginPrefixText: {
-    color: '#C5C5C5',
-    fontSize: 10.5,
+    color: '#A8A8A8',
+    fontSize: 11,
     fontWeight: '500',
   },
   loginOrangeText: {
