@@ -146,7 +146,7 @@ export default function LoginScreen() {
             >
               <Text style={styles.switchAuthText}>
                 Pas encore de compte ?{' '}
-                <Text style={styles.switchAuthHighlight}>S'INSCRIRE</Text>
+                <Text style={styles.switchAuthHighlight}>S&apos;INSCRIRE</Text>
               </Text>
             </TouchableOpacity>
           </ScrollView>

@@ -101,7 +101,7 @@ export default function SignupScreen() {
                 BIENVENUE SUR <Text style={styles.orangeText}>SIRA</Text>
               </Text>
               <Text style={styles.welcomeSubtitle}>
-                L'application qui simplifie{
+                L&apos;application qui simplifie{
 }vos déplacements à Abidjan.
               </Text>
             </View>
@@ -141,7 +141,7 @@ export default function SignupScreen() {
               onPress={handleSignup}
               activeOpacity={0.85}
             >
-              <Text style={styles.signupButtonText}>S'INSCRIRE</Text>
+              <Text style={styles.signupButtonText}>S&apos;INSCRIRE</Text>
             </TouchableOpacity>
 
             {/* Switch to Login Link */}
