@@ -16,6 +16,20 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 const { width, height } = Dimensions.get('window');
 
+/* Geometry measured on the designer mockup (canvas 253 x 326 for the hero area) */
+const HERO_HEIGHT = height * 0.7;
+
+const BG_WIDTH = width * 3.356;
+const BG_HEIGHT = (BG_WIDTH * 664) / 1024;
+const BG_LEFT = -width * 1.36;
+const BG_TOP = HERO_HEIGHT / 2 - width * 0.9328;
+
+const PHONE_HEIGHT = HERO_HEIGHT * 0.905;
+const PHONE_WIDTH = (PHONE_HEIGHT * 501) / 1024;
+const PHONE_TOP = HERO_HEIGHT * 0.139;
+const PHONE_RIGHT = -PHONE_WIDTH * 0.344;
+const PHONE_ROTATION = '11.3deg';
+
 interface OnboardingSlide {
   id: string;
   title: string;
@@ -75,16 +89,13 @@ export default function OnboardingScreen() {
   const renderSlide = ({ item }: { item: OnboardingSlide }) => {
     return (
       <View style={styles.slide}>
-        {/* Layer 1: Background Bridge Image showcasing top pylon & highway road */}
-        <Image
-          source={item.heroBgImage}
-          style={styles.heroBgImage}
-          contentFit="cover"
-          contentPosition={{ top: '10%', left: '28%' }}
-        />
+        {/* Layer 1: Background Bridge Image framed on the pylon & highway, as in the mockup */}
+        <View style={styles.heroBgClip}>
+          <Image source={item.heroBgImage} style={styles.heroBgImage} contentFit="fill" />
+        </View>
         <View style={styles.heroOverlayGradient} />
 
-        {/* Layer 2: iPhone Mockup matching exact Designer tilt (14.5deg) and right position */}
+        {/* Layer 2: iPhone Mockup matching the designer tilt and right position */}
         <View style={styles.phoneMockupContainer}>
           <Image
             source={item.phoneMockupImage}
@@ -215,27 +226,35 @@ const styles = StyleSheet.create({
   },
 
   /* Layer 1: Background Bridge Image */
-  heroBgImage: {
+  heroBgClip: {
     width: '100%',
-    height: height * 0.70,
+    height: HERO_HEIGHT,
+    overflow: 'hidden',
+  },
+  heroBgImage: {
+    position: 'absolute',
+    left: BG_LEFT,
+    top: BG_TOP,
+    width: BG_WIDTH,
+    height: BG_HEIGHT,
   },
   heroOverlayGradient: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
-    height: height * 0.70,
+    height: HERO_HEIGHT,
     backgroundColor: 'rgba(0, 0, 0, 0.04)',
   },
 
-  /* Layer 2: Phone Mockup tilted at 14.5deg & positioned exactly as designer reference */
+  /* Layer 2: Phone Mockup tilted & positioned exactly as the designer reference */
   phoneMockupContainer: {
     position: 'absolute',
-    right: -width * 0.12,
-    top: height * 0.16,
-    width: width * 0.80,
-    height: height * 0.63,
-    transform: [{ rotate: '14.5deg' }],
+    right: PHONE_RIGHT,
+    top: PHONE_TOP,
+    width: PHONE_WIDTH,
+    height: PHONE_HEIGHT,
+    transform: [{ rotate: PHONE_ROTATION }],
     zIndex: 12,
   },
   phoneMockupImage: {
