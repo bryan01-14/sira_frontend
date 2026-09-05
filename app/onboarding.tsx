@@ -16,26 +16,25 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 const { width, height } = Dimensions.get('window');
 
-/* Geometry measured on the designer mockup (canvas 253 x 326 for the hero area) */
-const HERO_HEIGHT = height * 0.7;
+/* Geometry measured on the designer mockup (slide canvas 123 x 265) */
+const CARD_TOP = height * 0.721;
 
-const BG_WIDTH = width * 3.356;
-const BG_HEIGHT = (BG_WIDTH * 664) / 1024;
-const BG_LEFT = -width * 1.36;
-const BG_TOP = HERO_HEIGHT / 2 - width * 0.9328;
-
-const PHONE_HEIGHT = HERO_HEIGHT * 0.905;
-const PHONE_WIDTH = (PHONE_HEIGHT * 501) / 1024;
-const PHONE_TOP = HERO_HEIGHT * 0.139;
-const PHONE_RIGHT = -PHONE_WIDTH * 0.344;
-const PHONE_ROTATION = '11.3deg';
+const PHONE_WIDTH = width * 0.5675;
+const PHONE_HEIGHT = (PHONE_WIDTH * 1024) / 501;
+const PHONE_TOP = height * 0.208;
+const PHONE_RIGHT = -PHONE_WIDTH * 0.34;
+const PHONE_ROTATION = '10.4deg';
 
 interface OnboardingSlide {
   id: string;
   title: string;
   description: string;
+  /* Brand word rendered in orange right before the description */
+  descriptionPrefix?: string;
   heroBgImage: any;
-  phoneMockupImage: any;
+  /* Horizontal framing of the photo, as in the mockup */
+  heroBgPosition: string;
+  phoneMockupImage?: any;
 }
 
 const SLIDES: OnboardingSlide[] = [
@@ -44,28 +43,41 @@ const SLIDES: OnboardingSlide[] = [
     title: 'LA PREMIÈRE PLATEFORME\nDE MOBILITÉ INTELLIGENTE',
     description: 'pensée pour simplifier vos déplacements\nà abidjan.',
     heroBgImage: require('@/assets/images/bridge-bg.png'),
+    heroBgPosition: '58%',
     phoneMockupImage: require('@/assets/images/sira-app-mockup.png'),
   },
   {
     id: '2',
-    title: 'CALCULEZ VOS ITINÉRAIRES\nEN TEMPS RÉEL',
-    description: 'trouvez le meilleur moyen de transport\nrapidement et sereinement.',
-    heroBgImage: require('@/assets/images/bridge-bg.png'),
-    phoneMockupImage: require('@/assets/images/sira-app-mockup.png'),
+    title: "TROUVEZ L'ITINÉRAIRE\nQUI VOUS CONVIENT",
+    descriptionPrefix: 'Sira',
+    description:
+      ' analyse les conditions de circulation\npour vous proposer des itinéraires\nadaptés à votre situation.',
+    heroBgImage: require('@/assets/images/onboarding-slide2.png'),
+    heroBgPosition: '50%',
   },
   {
     id: '3',
-    title: 'SUIVEZ VOS TRANSPORTS\nET TRAJETS EN DIRECT',
-    description: 'gagnez un temps précieux sur tous\nvos trajets quotidiens.',
-    heroBgImage: require('@/assets/images/bridge-bg.png'),
-    phoneMockupImage: require('@/assets/images/sira-app-mockup.png'),
+    title: 'CHOISISSEZ VOTRE FAÇON\nDE VOUS DÉPLACER',
+    description:
+      'comparez les différentes options de transport\ndisponibles pour choisir celle qui correspond\nle mieux à votre trajet.',
+    heroBgImage: require('@/assets/images/onboarding-slide3.png'),
+    heroBgPosition: '50%',
   },
   {
     id: '4',
-    title: 'VOS DESTINATIONS ET FAVORIS\nEN UN CLIC',
-    description: 'enregistrez vos lieux fréquents pour\ny accéder instantanément.',
-    heroBgImage: require('@/assets/images/bridge-bg.png'),
-    phoneMockupImage: require('@/assets/images/sira-app-mockup.png'),
+    title: 'ANTICIPEZ VOTRE TRAJET',
+    description:
+      'estimez le temps et le coût de\nvotre déplacement avant de prendre la route.',
+    heroBgImage: require('@/assets/images/onboarding-slide4.png'),
+    heroBgPosition: '50%',
+  },
+  {
+    id: '5',
+    title: 'RESTEZ INFORMÉ\nEN TEMPS RÉEL',
+    description:
+      'recevez des informations sur les perturbations,\nles incidents et les conditions de circulation\nsur votre trajet.',
+    heroBgImage: require('@/assets/images/onboarding-slide5.png'),
+    heroBgPosition: '50%',
   },
 ];
 
@@ -86,22 +98,75 @@ export default function OnboardingScreen() {
     router.replace('/(tabs)');
   };
 
-  const renderSlide = ({ item }: { item: OnboardingSlide }) => {
+  const renderSlide = ({ item, index }: { item: OnboardingSlide; index: number }) => {
     return (
       <View style={styles.slide}>
-        {/* Layer 1: Background Bridge Image framed on the pylon & highway, as in the mockup */}
-        <View style={styles.heroBgClip}>
-          <Image source={item.heroBgImage} style={styles.heroBgImage} contentFit="fill" />
-        </View>
-        <View style={styles.heroOverlayGradient} />
+        {/* Layer 1: Full bleed photo, framed as in the mockup */}
+        <Image
+          source={item.heroBgImage}
+          style={styles.heroBgImage}
+          contentFit="cover"
+          contentPosition={{ left: item.heroBgPosition }}
+          transition={0}
+        />
 
-        {/* Layer 2: iPhone Mockup matching the designer tilt and right position */}
-        <View style={styles.phoneMockupContainer}>
-          <Image
-            source={item.phoneMockupImage}
-            style={styles.phoneMockupImage}
-            contentFit="contain"
-          />
+        {/* Layer 2: Dark scrim covering the bottom third, the photo stays visible through it */}
+        <View style={styles.bottomScrim} />
+
+        {/* Layer 3: iPhone mockup, tilted and cropped by the right edge, overlapping the scrim */}
+        {item.phoneMockupImage ? (
+          <View style={styles.phoneMockupContainer}>
+            <Image
+              source={item.phoneMockupImage}
+              style={styles.phoneMockupImage}
+              contentFit="contain"
+            />
+          </View>
+        ) : null}
+
+        {/* Layer 4: Slide copy */}
+        <View style={styles.cardContent}>
+          {/* Progress: the orange bar sits at the active slide position */}
+          <View style={styles.progressRow}>
+            {SLIDES.map((_, dotIndex) => (
+              <View
+                key={dotIndex}
+                style={[
+                  styles.progressPill,
+                  dotIndex === index ? styles.progressPillActive : styles.progressPillInactive,
+                ]}
+              />
+            ))}
+          </View>
+
+          <Text style={styles.titleText}>{item.title}</Text>
+          <Text style={styles.descriptionText}>
+            {item.descriptionPrefix ? (
+              <Text style={styles.descriptionBrand}>{item.descriptionPrefix}</Text>
+            ) : null}
+            {item.description}
+          </Text>
+
+          <View style={styles.actionsRow}>
+            <TouchableOpacity
+              style={styles.registerButton}
+              onPress={handleNavigate}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.registerButtonText}>S&apos;INSCRIRE</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.loginButton}
+              onPress={handleNavigate}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.loginPrefixText} numberOfLines={1}>
+                J&apos;ai déjà un compte.{' '}
+                <Text style={styles.loginOrangeText}>SE CONNECTER</Text>
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
     );
@@ -111,7 +176,7 @@ export default function OnboardingScreen() {
     <View style={styles.container}>
       <StatusBar style="light" />
 
-      {/* Layer 4: Top Left Circular Back Arrow Button (←) */}
+      {/* Top Left Circular Back Arrow Button */}
       <SafeAreaView style={styles.topBar}>
         <TouchableOpacity
           style={styles.backButton}
@@ -122,7 +187,6 @@ export default function OnboardingScreen() {
         </TouchableOpacity>
       </SafeAreaView>
 
-      {/* Horizontal Slide Carousel */}
       <FlatList
         ref={flatListRef}
         data={SLIDES}
@@ -136,57 +200,6 @@ export default function OnboardingScreen() {
         bounces={false}
         style={styles.flatList}
       />
-
-      {/* Layer 3: Bottom Sheet Dark Card (Positioned at 33% height, matching Designer mockup) */}
-      <View style={styles.bottomCard}>
-        {/* Progress Bar (Orange Bar + 3 White Dots) */}
-        <View style={styles.progressRow}>
-          {SLIDES.map((_, index) => {
-            const isActive = index === currentIndex;
-            return (
-              <View
-                key={index}
-                style={[
-                  styles.progressPill,
-                  isActive ? styles.progressPillActive : styles.progressPillInactive,
-                ]}
-              />
-            );
-          })}
-        </View>
-
-        {/* Headline Title */}
-        <Text style={styles.titleText}>
-          {SLIDES[currentIndex].title}
-        </Text>
-
-        {/* Subtitle Description */}
-        <Text style={styles.descriptionText}>
-          {SLIDES[currentIndex].description}
-        </Text>
-
-        {/* Actions Row: S'INSCRIRE & J'ai déjà un compte. SE CONNECTER on ONE SINGLE LINE */}
-        <View style={styles.actionsRow}>
-          <TouchableOpacity
-            style={styles.registerButton}
-            onPress={handleNavigate}
-            activeOpacity={0.85}
-          >
-            <Text style={styles.registerButtonText}>S'INSCRIRE</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.loginButton}
-            onPress={handleNavigate}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.loginPrefixText} numberOfLines={1}>
-              J'ai déjà un compte.{' '}
-              <Text style={styles.loginOrangeText}>SE CONNECTER</Text>
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </View>
     </View>
   );
 }
@@ -217,37 +230,34 @@ const styles = StyleSheet.create({
   },
   flatList: {
     flex: 1,
-    zIndex: 10,
   },
   slide: {
     width: width,
     height: height,
     position: 'relative',
+    backgroundColor: '#000000',
   },
 
-  /* Layer 1: Background Bridge Image */
-  heroBgClip: {
-    width: '100%',
-    height: HERO_HEIGHT,
-    overflow: 'hidden',
-  },
+  /* Layer 1: full bleed photo */
   heroBgImage: {
-    position: 'absolute',
-    left: BG_LEFT,
-    top: BG_TOP,
-    width: BG_WIDTH,
-    height: BG_HEIGHT,
-  },
-  heroOverlayGradient: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
-    height: HERO_HEIGHT,
-    backgroundColor: 'rgba(0, 0, 0, 0.04)',
+    bottom: 0,
   },
 
-  /* Layer 2: Phone Mockup tilted & positioned exactly as the designer reference */
+  /* Layer 2: bottom scrim */
+  bottomScrim: {
+    position: 'absolute',
+    top: CARD_TOP,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.86)',
+  },
+
+  /* Layer 3: phone mockup */
   phoneMockupContainer: {
     position: 'absolute',
     right: PHONE_RIGHT,
@@ -255,27 +265,22 @@ const styles = StyleSheet.create({
     width: PHONE_WIDTH,
     height: PHONE_HEIGHT,
     transform: [{ rotate: PHONE_ROTATION }],
-    zIndex: 12,
   },
   phoneMockupImage: {
     width: '100%',
     height: '100%',
   },
 
-  /* Layer 3: Bottom Sheet Dark Card starting at bottom 33% height */
-  bottomCard: {
+  /* Layer 4: copy */
+  cardContent: {
     position: 'absolute',
-    bottom: 0,
+    top: CARD_TOP,
     left: 0,
     right: 0,
-    backgroundColor: '#000000',
+    bottom: 0,
     paddingHorizontal: 20,
-    paddingTop: 18,
-    paddingBottom: 38,
-    zIndex: 30,
+    paddingTop: 22,
   },
-
-  /* Indicators: Long Orange Pill + Round White Dots */
   progressRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -295,8 +300,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     opacity: 0.95,
   },
-
-  /* Title: Heavy Uppercase Font on 2 lines */
   titleText: {
     color: '#FFFFFF',
     fontSize: 21,
@@ -306,17 +309,17 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     textTransform: 'uppercase',
   },
-
-  /* Subtitle */
   descriptionText: {
     color: '#C5C5C5',
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '400',
-    lineHeight: 20,
-    marginBottom: 22,
+    lineHeight: 19,
+    marginBottom: 18,
   },
-
-  /* Actions Row: Fits S'INSCRIRE & J'ai déjà un compte. SE CONNECTER on ONE SINGLE LINE */
+  descriptionBrand: {
+    color: '#F5701E',
+    fontWeight: '700',
+  },
   actionsRow: {
     flexDirection: 'row',
     alignItems: 'center',
