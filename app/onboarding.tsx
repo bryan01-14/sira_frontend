@@ -52,7 +52,7 @@ const SLIDES: OnboardingSlide[] = [
     descriptionPrefix: 'Sira',
     description:
       ' analyse les conditions de circulation\npour vous proposer des itinéraires\nadaptés à votre situation.',
-    heroBgImage: require('@/assets/images/onboarding-slide2.png'),
+    heroBgImage: require('@/assets/images/slide2-bg.jpg'),
     heroBgPosition: '50%',
   },
   {
@@ -60,7 +60,7 @@ const SLIDES: OnboardingSlide[] = [
     title: 'CHOISISSEZ VOTRE FAÇON\nDE VOUS DÉPLACER',
     description:
       'comparez les différentes options de transport\ndisponibles pour choisir celle qui correspond\nle mieux à votre trajet.',
-    heroBgImage: require('@/assets/images/onboarding-slide3.png'),
+    heroBgImage: require('@/assets/images/slide3-bg.jpg'),
     heroBgPosition: '50%',
   },
   {
@@ -68,15 +68,15 @@ const SLIDES: OnboardingSlide[] = [
     title: 'ANTICIPEZ VOTRE TRAJET',
     description:
       'estimez le temps et le coût de\nvotre déplacement avant de prendre la route.',
-    heroBgImage: require('@/assets/images/onboarding-slide4.png'),
-    heroBgPosition: '50%',
+    heroBgImage: require('@/assets/images/slide4-bg.jpg'),
+    heroBgPosition: '66%',
   },
   {
     id: '5',
     title: 'RESTEZ INFORMÉ\nEN TEMPS RÉEL',
     description:
       'recevez des informations sur les perturbations,\nles incidents et les conditions de circulation\nsur votre trajet.',
-    heroBgImage: require('@/assets/images/onboarding-slide5.png'),
+    heroBgImage: require('@/assets/images/slide5-bg.jpg'),
     heroBgPosition: '50%',
   },
 ];
@@ -94,8 +94,16 @@ export default function OnboardingScreen() {
     }
   };
 
-  const handleNavigate = () => {
-    router.replace('/(tabs)');
+  const handleBack = () => {
+    router.replace('/');
+  };
+
+  const handleGoToSignup = () => {
+    router.push('/signup');
+  };
+
+  const handleGoToLogin = () => {
+    router.push('/login');
   };
 
   const renderSlide = ({ item, index }: { item: OnboardingSlide; index: number }) => {
@@ -150,7 +158,7 @@ export default function OnboardingScreen() {
           <View style={styles.actionsRow}>
             <TouchableOpacity
               style={styles.registerButton}
-              onPress={handleNavigate}
+              onPress={handleGoToSignup}
               activeOpacity={0.85}
             >
               <Text style={styles.registerButtonText}>S&apos;INSCRIRE</Text>
@@ -158,7 +166,7 @@ export default function OnboardingScreen() {
 
             <TouchableOpacity
               style={styles.loginButton}
-              onPress={handleNavigate}
+              onPress={handleGoToLogin}
               activeOpacity={0.7}
             >
               <Text style={styles.loginPrefixText} numberOfLines={1}>
@@ -176,17 +184,6 @@ export default function OnboardingScreen() {
     <View style={styles.container}>
       <StatusBar style="light" />
 
-      {/* Top Left Circular Back Arrow Button */}
-      <SafeAreaView style={styles.topBar}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={handleNavigate}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.backArrowText}>←</Text>
-        </TouchableOpacity>
-      </SafeAreaView>
-
       <FlatList
         ref={flatListRef}
         data={SLIDES}
@@ -200,6 +197,13 @@ export default function OnboardingScreen() {
         bounces={false}
         style={styles.flatList}
       />
+
+      {/* Circular back arrow floating above the carousel */}
+      <SafeAreaView style={styles.topBar} pointerEvents="box-none">
+        <TouchableOpacity style={styles.backButton} onPress={handleBack} activeOpacity={0.8}>
+          <Text style={styles.backArrowText}>←</Text>
+        </TouchableOpacity>
+      </SafeAreaView>
     </View>
   );
 }
@@ -216,10 +220,10 @@ const styles = StyleSheet.create({
     zIndex: 50,
   },
   backButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#000000',
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -257,7 +261,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.86)',
   },
 
-  /* Layer 3: phone mockup */
+  /* Layer 3: tilted iPhone mockup */
   phoneMockupContainer: {
     position: 'absolute',
     right: PHONE_RIGHT,
@@ -265,13 +269,18 @@ const styles = StyleSheet.create({
     width: PHONE_WIDTH,
     height: PHONE_HEIGHT,
     transform: [{ rotate: PHONE_ROTATION }],
+    shadowColor: '#000000',
+    shadowOffset: { width: -6, height: 10 },
+    shadowOpacity: 0.45,
+    shadowRadius: 16,
+    elevation: 12,
   },
   phoneMockupImage: {
     width: '100%',
     height: '100%',
   },
 
-  /* Layer 4: copy */
+  /* Layer 4: slide copy */
   cardContent: {
     position: 'absolute',
     top: CARD_TOP,
@@ -281,6 +290,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 22,
   },
+
   progressRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -288,18 +298,19 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   progressPill: {
-    height: 6,
-    borderRadius: 3,
+    height: 5,
+    borderRadius: 2.5,
   },
   progressPillActive: {
-    width: 48,
+    width: 44,
     backgroundColor: '#F26522',
   },
   progressPillInactive: {
-    width: 6,
+    width: 5,
     backgroundColor: '#FFFFFF',
     opacity: 0.95,
   },
+
   titleText: {
     color: '#FFFFFF',
     fontSize: 21,
@@ -327,9 +338,9 @@ const styles = StyleSheet.create({
   },
   registerButton: {
     backgroundColor: '#F26522',
-    paddingHorizontal: 18,
-    paddingVertical: 11,
-    borderRadius: 18,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 20,
   },
   registerButtonText: {
     color: '#FFFFFF',
@@ -343,8 +354,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   loginPrefixText: {
-    color: '#C5C5C5',
-    fontSize: 10.5,
+    color: '#A8A8A8',
+    fontSize: 11,
     fontWeight: '500',
   },
   loginOrangeText: {
