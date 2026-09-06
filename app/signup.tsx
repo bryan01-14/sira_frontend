@@ -14,7 +14,7 @@ import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { IconSymbol } from '@/components/ui/icon-symbol';
+import { Ionicons } from '@expo/vector-icons';
 
 const { width } = Dimensions.get('window');
 
@@ -22,14 +22,6 @@ export default function SignupScreen() {
   const router = useRouter();
   const [firstName, setFirstName] = useState('');
   const [phone, setPhone] = useState('');
-
-  const handleBack = () => {
-    if (router.canGoBack()) {
-      router.back();
-    } else {
-      router.replace('/onboarding');
-    }
-  };
 
   const handleSignup = () => {
     router.replace('/(tabs)');
@@ -43,121 +35,131 @@ export default function SignupScreen() {
     <View style={styles.container}>
       <StatusBar style="dark" />
 
-      {/* Top Background: White Sky with Sira Logo and Slogan */}
-      <View style={styles.topHeader}>
-        <SafeAreaView style={styles.topSafeArea}>
-          <View style={styles.navRow}>
-            <TouchableOpacity
-              style={styles.backButton}
-              onPress={handleBack}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.backArrowText}>←</Text>
-            </TouchableOpacity>
-          </View>
+      {/* Subtle Background Watermark GPS Path */}
+      <Image
+        source={require('@/assets/images/pin-path-decor-vector.png')}
+        style={styles.bgWatermarkDecor}
+        contentFit="contain"
+      />
 
-          {/* Sira Brand Logo */}
-          <View style={styles.headerLogoContainer}>
-            <Image
-              source={require('@/assets/images/sira-logo-transparent.png')}
-              style={styles.headerLogoImage}
-              contentFit="contain"
-            />
-          </View>
-        </SafeAreaView>
-      </View>
-
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.keyboardView}
-      >
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          bounces={false}
-          showsVerticalScrollIndicator={false}
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.keyboardView}
         >
-          {/* Middle Wave City Picture with Tilted iPhone Mockup on the Left */}
-          <View style={styles.heroSection}>
-            <Image
-              source={require('@/assets/images/signup-wave-city.jpg')}
-              style={styles.waveCityImage}
-              contentFit="cover"
-            />
+          <ScrollView
+            contentContainerStyle={styles.scrollContent}
+            bounces={false}
+            showsVerticalScrollIndicator={false}
+          >
+            {/* Top Navigation Row with Black Back Button and Sira Brand Logo */}
+            <View style={styles.topNavHeader}>
+              <TouchableOpacity
+                style={styles.backButton}
+                onPress={() => router.back()}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="arrow-back" size={18} color="#FFFFFF" />
+              </TouchableOpacity>
 
-            {/* Tilted iPhone Mockup on the left side of the wave */}
-            <View style={styles.mockupContainer}>
+              <View style={styles.headerLogoContainer}>
+                <Image
+                  source={require('@/assets/images/sira-logo-vector.png')}
+                  style={styles.headerLogoImage}
+                  contentFit="contain"
+                />
+                <View style={styles.headerTaglineRow}>
+                  <Text style={styles.taglineBlack}>ON TRACE, </Text>
+                  <Text style={styles.taglineOrange}>SANS STRESS.</Text>
+                </View>
+              </View>
+
+              {/* Balance spacer */}
+              <View style={styles.spacerRight} />
+            </View>
+
+            {/* Middle Wave City Picture with iPhone Mockup on the Left over pure white background */}
+            <View style={styles.heroSection}>
               <Image
-                source={require('@/assets/images/sira-app-mockup.png')}
-                style={styles.mockupImage}
+                source={require('@/assets/images/signup-wave-city-pure.png')}
+                style={styles.waveCityImage}
                 contentFit="contain"
               />
-            </View>
-          </View>
 
-          {/* Bottom Card / White Background Section */}
-          <View style={styles.bottomSection}>
-            <View style={styles.titleContainer}>
-              <Text style={styles.welcomeTitle}>
-                BIENVENUE SUR <Text style={styles.orangeText}>SIRA</Text>
-              </Text>
-              <Text style={styles.welcomeSubtitle}>
-                L'application qui simplifie{
-}vos déplacements à Abidjan.
-              </Text>
-            </View>
-
-            {/* Input 1: Prénom */}
-            <View style={styles.inputWrapper}>
-              <View style={styles.iconCircle}>
-                <IconSymbol name="house.fill" size={16} color="#FFFFFF" />
+              {/* Front-facing iPhone Mockup on the left side of the wave */}
+              <View style={styles.mockupContainer}>
+                <Image
+                  source={require('@/assets/images/sira-phone-vertical-straight.png')}
+                  style={styles.mockupImage}
+                  contentFit="contain"
+                />
               </View>
-              <TextInput
-                style={styles.textInput}
-                placeholder="Prénom"
-                placeholderTextColor="#7E7E7E"
-                value={firstName}
-                onChangeText={setFirstName}
-              />
             </View>
 
-            {/* Input 2: Numéro Orange */}
-            <View style={styles.inputWrapper}>
-              <View style={styles.iconCircle}>
-                <IconSymbol name="house.fill" size={16} color="#FFFFFF" />
+            {/* Bottom Form Section */}
+            <View style={styles.bottomSection}>
+              <View style={styles.titleContainer}>
+                <Text style={styles.welcomeTitle}>
+                  BIENVENUE SUR <Text style={styles.orangeText}>SIRA</Text>
+                </Text>
+                <Text style={styles.welcomeSubtitle}>
+                  L'application qui simplifie{'\n'}vos déplacements à Abidjan.
+                </Text>
               </View>
-              <TextInput
-                style={styles.textInput}
-                placeholder="Entrez votre numéro Orange"
-                placeholderTextColor="#7E7E7E"
-                keyboardType="phone-pad"
-                value={phone}
-                onChangeText={setPhone}
-              />
+
+              {/* Input 1: Prénom */}
+              <View style={styles.inputWrapper}>
+                <View style={styles.iconCircle}>
+                  <Ionicons name="person" size={17} color="#FFFFFF" />
+                </View>
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="Prenom"
+                  placeholderTextColor="#888888"
+                  value={firstName}
+                  onChangeText={setFirstName}
+                />
+              </View>
+
+              {/* Input 2: Numéro Orange */}
+              <View style={styles.inputWrapper}>
+                <View style={styles.iconCircle}>
+                  <Ionicons name="person" size={17} color="#FFFFFF" />
+                </View>
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="Entrez votre numéro Orange"
+                  placeholderTextColor="#888888"
+                  keyboardType="phone-pad"
+                  value={phone}
+                  onChangeText={setPhone}
+                />
+              </View>
+
+              {/* Orange Inscription Button */}
+              <TouchableOpacity
+                style={styles.signupButton}
+                onPress={handleSignup}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.signupButtonText}>S'INSCRIRE</Text>
+              </TouchableOpacity>
+
+              {/* Switch to Login Link */}
+              <TouchableOpacity
+                style={styles.switchAuthButton}
+                onPress={handleGoToLogin}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.switchAuthText}>
+                  Déjà un compte ?{' '}
+                  <Text style={styles.switchAuthHighlight}>SE CONNECTER</Text>
+                </Text>
+              </TouchableOpacity>
             </View>
-
-            {/* Orange Inscription Button */}
-            <TouchableOpacity
-              style={styles.signupButton}
-              onPress={handleSignup}
-              activeOpacity={0.85}
-            >
-              <Text style={styles.signupButtonText}>S'INSCRIRE</Text>
-            </TouchableOpacity>
-
-            {/* Switch to Login Link */}
-            <TouchableOpacity
-              style={styles.switchAuthButton}
-              onPress={handleGoToLogin}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.switchAuthText}>
-                Déjà un compte ?{' '}
-                <Text style={styles.switchAuthHighlight}>SE CONNECTER</Text>
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
     </View>
   );
 }
@@ -166,55 +168,85 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#FFFFFF',
+    position: 'relative',
   },
-  topHeader: {
-    backgroundColor: '#FFFFFF',
-    paddingBottom: 4,
-    zIndex: 10,
+  safeArea: {
+    flex: 1,
   },
-  topSafeArea: {
-    paddingHorizontal: 20,
-    paddingTop: 8,
-  },
-  navRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  backButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#000000',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  backArrowText: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '800',
-  },
-  headerLogoContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: -8,
-    marginBottom: 6,
-  },
-  headerLogoImage: {
-    width: 130,
-    height: 60,
+  bgWatermarkDecor: {
+    position: 'absolute',
+    top: 10,
+    right: -10,
+    width: width * 0.95,
+    height: 380,
+    opacity: 0.12,
+    zIndex: 0,
   },
   keyboardView: {
     flex: 1,
   },
   scrollContent: {
     flexGrow: 1,
-    paddingBottom: 30,
+    paddingBottom: 25,
+  },
+  topNavHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 18,
+    paddingTop: 4,
+    paddingBottom: 4,
+    zIndex: 5,
+  },
+  backButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#000000',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  spacerRight: {
+    width: 34,
+  },
+  headerLogoContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerLogoImage: {
+    width: 145,
+    height: 68,
+  },
+  headerTaglineRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  taglineBlack: {
+    color: '#111111',
+    fontSize: 10.5,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+  },
+  taglineOrange: {
+    color: '#F26522',
+    fontSize: 10.5,
+    fontWeight: '900',
+    letterSpacing: 0.8,
   },
   heroSection: {
     width: '100%',
-    height: 250,
+    height: 310,
     position: 'relative',
     marginVertical: 4,
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    overflow: 'visible',
   },
   waveCityImage: {
     width: '100%',
@@ -223,16 +255,15 @@ const styles = StyleSheet.create({
   mockupContainer: {
     position: 'absolute',
     left: 14,
-    top: 8,
-    width: 140,
-    height: 230,
-    transform: [{ rotate: '-1.5deg' }],
+    bottom: 22,
+    width: 124,
+    height: 216,
     zIndex: 15,
     shadowColor: '#000000',
-    shadowOffset: { width: 4, height: 6 },
-    shadowOpacity: 0.35,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.32,
     shadowRadius: 10,
-    elevation: 8,
+    elevation: 10,
   },
   mockupImage: {
     width: '100%',
@@ -240,16 +271,16 @@ const styles = StyleSheet.create({
   },
   bottomSection: {
     paddingHorizontal: 28,
-    paddingTop: 12,
+    paddingTop: 10,
     alignItems: 'center',
   },
   titleContainer: {
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 16,
   },
   welcomeTitle: {
-    color: '#121212',
-    fontSize: 20,
+    color: '#111111',
+    fontSize: 21,
     fontWeight: '900',
     letterSpacing: 0.5,
     textAlign: 'center',
@@ -258,7 +289,7 @@ const styles = StyleSheet.create({
     color: '#F26522',
   },
   welcomeSubtitle: {
-    color: '#666666',
+    color: '#555555',
     fontSize: 13,
     lineHeight: 18,
     textAlign: 'center',
@@ -272,7 +303,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingVertical: 5,
     marginBottom: 14,
   },
   iconCircle: {
@@ -293,21 +324,21 @@ const styles = StyleSheet.create({
   },
   signupButton: {
     backgroundColor: '#F26522',
-    paddingHorizontal: 36,
+    paddingHorizontal: 40,
     paddingVertical: 12,
     borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 10,
+    marginTop: 8,
     shadowColor: '#F26522',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
+    shadowOpacity: 0.4,
     shadowRadius: 8,
     elevation: 6,
   },
   signupButtonText: {
     color: '#FFFFFF',
-    fontSize: 12,
+    fontSize: 12.5,
     fontWeight: '900',
     letterSpacing: 0.6,
   },

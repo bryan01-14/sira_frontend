@@ -1,17 +1,17 @@
-import React, { useState, useRef } from 'react';
-import {
-  StyleSheet,
-  View,
-  Text,
-  Dimensions,
-  FlatList,
-  TouchableOpacity,
-  NativeSyntheticEvent,
-  NativeScrollEvent,
-} from 'react-native';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { useEffect, useRef, useState } from 'react';
+import {
+  Dimensions,
+  FlatList,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const { width, height } = Dimensions.get('window');
@@ -30,7 +30,7 @@ const SLIDES: OnboardingSlide[] = [
     title: 'LA PREMIÈRE PLATEFORME\nDE MOBILITÉ INTELLIGENTE',
     description: 'pensée pour simplifier vos déplacements\nà abidjan.',
     heroBgImage: require('@/assets/images/bridge-bg.jpg'),
-    phoneMockupImage: require('@/assets/images/sira-app-mockup.png'),
+    phoneMockupImage: require('@/assets/images/sira-phone-official-mockup.png'),
   },
   {
     id: '2',
@@ -63,6 +63,20 @@ export default function OnboardingScreen() {
   const flatListRef = useRef<FlatList>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
 
+  // Automatic carousel scroll timer with loop back to beginning
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const nextIndex = (currentIndex + 1) % SLIDES.length;
+      flatListRef.current?.scrollToOffset({
+        offset: nextIndex * width,
+        animated: true,
+      });
+      setCurrentIndex(nextIndex);
+    }, 3500);
+
+    return () => clearInterval(timer);
+  }, [currentIndex]);
+
   const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const contentOffsetX = event.nativeEvent.contentOffset.x;
     const index = Math.round(contentOffsetX / width);
@@ -86,12 +100,12 @@ export default function OnboardingScreen() {
   const renderSlide = ({ item }: { item: OnboardingSlide }) => {
     return (
       <View style={styles.slide}>
-        {/* Layer 1: Background Image */}
+        {/* Layer 1: Background Image with visible bridge tower on the left */}
         <Image
           source={item.heroBgImage}
           style={styles.heroBgImage}
           contentFit="cover"
-          contentPosition={item.phoneMockupImage ? { top: '0%', left: '46%' } : 'center'}
+          contentPosition={item.phoneMockupImage ? { top: '0%', left: '72%' } : 'center'}
         />
         <View style={styles.heroOverlayGradient} />
 
@@ -234,14 +248,14 @@ const styles = StyleSheet.create({
   /* Layer 1: Background Image */
   heroBgImage: {
     width: '100%',
-    height: height * 0.72,
+    height: height * 0.70,
   },
   heroOverlayGradient: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
-    height: height * 0.72,
+    height: height * 0.70,
     backgroundColor: 'rgba(0, 0, 0, 0.02)',
   },
 
@@ -251,7 +265,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    height: height * 0.32,
+    height: height * 0.34,
     backgroundColor: '#000000',
     zIndex: 5,
   },
@@ -259,17 +273,16 @@ const styles = StyleSheet.create({
   /* Layer 3: Phone Mockup in FRONT of black backdrop */
   phoneMockupContainer: {
     position: 'absolute',
-    right: -width * 0.17,
-    top: height * 0.13,
-    width: width * 0.74,
-    height: height * 0.64,
-    transform: [{ rotate: '13.5deg' }],
+    right: -width * 0.16,
+    top: height * 0.05,
+    width: width * 0.85,
+    height: height * 0.74,
     zIndex: 15,
     shadowColor: '#000000',
-    shadowOffset: { width: -6, height: 10 },
-    shadowOpacity: 0.45,
-    shadowRadius: 16,
-    elevation: 12,
+    shadowOffset: { width: -8, height: 14 },
+    shadowOpacity: 0.35,
+    shadowRadius: 20,
+    elevation: 14,
   },
   phoneMockupImage: {
     width: '100%',

@@ -14,21 +14,13 @@ import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { IconSymbol } from '@/components/ui/icon-symbol';
+import { Ionicons } from '@expo/vector-icons';
 
 const { width } = Dimensions.get('window');
 
 export default function LoginScreen() {
   const router = useRouter();
   const [phone, setPhone] = useState('');
-
-  const handleBack = () => {
-    if (router.canGoBack()) {
-      router.back();
-    } else {
-      router.replace('/onboarding');
-    }
-  };
 
   const handleLogin = () => {
     router.replace('/(tabs)');
@@ -51,7 +43,18 @@ export default function LoginScreen() {
       {/* Dark overlay with highway night atmosphere */}
       <View style={styles.darkOverlay} />
 
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
+        {/* Top Left Circular Orange Back Button */}
+        <View style={styles.topNavRow}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => router.back()}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="arrow-back" size={18} color="#FFFFFF" />
+          </TouchableOpacity>
+        </View>
+
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.keyboardView}
@@ -61,37 +64,28 @@ export default function LoginScreen() {
             bounces={false}
             showsVerticalScrollIndicator={false}
           >
-            {/* Top Navigation Bar: Orange Circular Back Button (←) */}
-            <View style={styles.topBar}>
-              <TouchableOpacity
-                style={styles.backButton}
-                onPress={handleBack}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.backArrowText}>←</Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Top Diagonal Road Stripe with Orange Slogan Banner */}
+            {/* Top Diagonal Road Stripe Banner with Orange Slogan and Official Pin */}
             <View style={styles.roadStripeContainer}>
               <Image
-                source={require('@/assets/images/road-stripe.png')}
+                source={require('@/assets/images/road-stripe-vector.png')}
                 style={styles.roadStripeImage}
                 contentFit="contain"
               />
               <View style={styles.sloganRow}>
                 <Text style={styles.sloganWhite}>ON TRACE, </Text>
                 <Text style={styles.sloganOrange}>SANS STRESS.</Text>
-                <View style={styles.pinMarker}>
-                  <Text style={styles.pinIconText}>📍</Text>
-                </View>
+                <Image
+                  source={require('@/assets/images/orange-pin-icon.png')}
+                  style={styles.pinImage}
+                  contentFit="contain"
+                />
               </View>
             </View>
 
-            {/* Sira Brand Logo with Road Element */}
+            {/* Sira Brand White Logo */}
             <View style={styles.logoContainer}>
               <Image
-                source={require('@/assets/images/sira-logo-transparent.png')}
+                source={require('@/assets/images/sira-logo-white.png')}
                 style={styles.logoImage}
                 contentFit="contain"
               />
@@ -104,12 +98,9 @@ export default function LoginScreen() {
                 DE <Text style={styles.titleOrange}>VOUS REVOIR</Text>
               </Text>
               <Text style={styles.subtitle}>
-                Votre mobilité à Abidjan vous attend.{
-}
-                Entrez votre numéro Orange{
-}
-                pour accéder à votre compte{
-}
+                Votre mobilité à Abidjan vous attend.{'\n'}
+                Entrez votre numéro Orange{'\n'}
+                pour accéder à votre compte{'\n'}
                 et retrouver votre expérience SIRA.
               </Text>
             </View>
@@ -117,12 +108,12 @@ export default function LoginScreen() {
             {/* Input Field: Orange User Icon + Dark Pill */}
             <View style={styles.inputWrapper}>
               <View style={styles.iconCircle}>
-                <IconSymbol name="house.fill" size={16} color="#FFFFFF" />
+                <Ionicons name="person" size={17} color="#FFFFFF" />
               </View>
               <TextInput
                 style={styles.textInput}
                 placeholder="07 XX XX XX XX"
-                placeholderTextColor="#7E7E7E"
+                placeholderTextColor="#888888"
                 keyboardType="phone-pad"
                 value={phone}
                 onChangeText={setPhone}
@@ -176,25 +167,17 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(10, 10, 10, 0.88)',
+    backgroundColor: 'rgba(8, 8, 8, 0.86)',
   },
   safeArea: {
     flex: 1,
   },
-  keyboardView: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingHorizontal: 28,
-    paddingTop: 10,
-    paddingBottom: 40,
-    alignItems: 'center',
-  },
-  topBar: {
-    width: '100%',
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
+  topNavRow: {
+    paddingHorizontal: 20,
+    paddingTop: 6,
+    paddingBottom: 2,
+    zIndex: 10,
+    alignItems: 'flex-start',
   },
   backButton: {
     width: 36,
@@ -203,64 +186,74 @@ const styles = StyleSheet.create({
     backgroundColor: '#F26522',
     justifyContent: 'center',
     alignItems: 'center',
+    shadowColor: '#F26522',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.35,
+    shadowRadius: 6,
+    elevation: 4,
   },
-  backArrowText: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '800',
+  keyboardView: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingHorizontal: 28,
+    paddingTop: 4,
+    paddingBottom: 35,
+    alignItems: 'center',
   },
   roadStripeContainer: {
-    width: '100%',
+    width: width,
     alignItems: 'center',
-    marginVertical: 10,
+    marginVertical: 12,
     position: 'relative',
-    height: 54,
+    height: 85,
     justifyContent: 'center',
+    alignSelf: 'center',
   },
   roadStripeImage: {
     position: 'absolute',
-    width: width * 0.95,
-    height: 48,
-    transform: [{ rotate: '-8deg' }],
-    opacity: 0.9,
+    width: width * 1.5,
+    height: 60,
+    transform: [{ rotate: '-9.5deg' }],
   },
   sloganRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    transform: [{ rotate: '-8deg' }],
+    transform: [{ rotate: '-9.5deg' }],
     zIndex: 5,
+    paddingHorizontal: 8,
   },
   sloganWhite: {
     color: '#FFFFFF',
-    fontSize: 13,
+    fontSize: 17,
     fontWeight: '900',
-    letterSpacing: 0.6,
+    letterSpacing: 0.8,
   },
   sloganOrange: {
     color: '#F26522',
-    fontSize: 13,
+    fontSize: 17,
     fontWeight: '900',
-    letterSpacing: 0.6,
+    letterSpacing: 0.8,
   },
-  pinMarker: {
-    marginLeft: 4,
-  },
-  pinIconText: {
-    fontSize: 16,
+  pinImage: {
+    width: 32,
+    height: 42,
+    marginLeft: 8,
+    marginBottom: 10,
   },
   logoContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 18,
-    marginBottom: 20,
+    marginTop: 22,
+    marginBottom: 22,
   },
   logoImage: {
-    width: 140,
-    height: 70,
+    width: 175,
+    height: 88,
   },
   textContainer: {
     alignItems: 'center',
-    marginBottom: 32,
+    marginBottom: 30,
   },
   titleLine1: {
     color: '#FFFFFF',
@@ -281,9 +274,9 @@ const styles = StyleSheet.create({
     color: '#F26522',
   },
   subtitle: {
-    color: '#A0A0A0',
+    color: '#C0C0C0',
     fontSize: 13,
-    lineHeight: 19,
+    lineHeight: 20,
     textAlign: 'center',
     marginTop: 12,
     fontWeight: '400',
@@ -295,15 +288,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingVertical: 5,
     marginBottom: 26,
     borderWidth: 1,
     borderColor: '#424242',
   },
   iconCircle: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: '#F26522',
     justifyContent: 'center',
     alignItems: 'center',
@@ -314,11 +307,11 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '600',
-    paddingVertical: 10,
+    paddingVertical: 8,
   },
   loginButton: {
     backgroundColor: '#F26522',
-    paddingHorizontal: 36,
+    paddingHorizontal: 38,
     paddingVertical: 12,
     borderRadius: 20,
     alignItems: 'center',
@@ -331,7 +324,7 @@ const styles = StyleSheet.create({
   },
   loginButtonText: {
     color: '#FFFFFF',
-    fontSize: 12,
+    fontSize: 12.5,
     fontWeight: '900',
     letterSpacing: 0.6,
   },
