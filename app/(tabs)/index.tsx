@@ -1,149 +1,255 @@
-import React from 'react';
-import { StyleSheet, View, Text, ScrollView, TouchableOpacity } from 'react-native';
+import React, { useState } from 'react';
+import {
+  StyleSheet,
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  Dimensions,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+} from 'react-native';
 import { Image } from 'expo-image';
+import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { IconSymbol } from '@/components/ui/icon-symbol';
+import { Ionicons } from '@expo/vector-icons';
+
+const { width, height } = Dimensions.get('window');
 
 export default function HomeScreen() {
+  const router = useRouter();
+  const [destination, setDestination] = useState('');
+
+  const handleSearchPress = () => {
+    // Navigate to route planning screen
+    router.push('/(tabs)/explore');
+  };
+
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar style="light" />
-      
-      {/* Top Bar */}
-      <View style={styles.header}>
-        <Image
-          source={require('@/assets/images/sira-logo-transparent.png')}
-          style={styles.headerLogo}
-          contentFit="contain"
-        />
-        <TouchableOpacity style={styles.profileButton}>
-          <IconSymbol name="house.fill" size={20} color="#FFFFFF" />
-        </TouchableOpacity>
-      </View>
+    <View style={styles.container}>
+      <StatusBar style="dark" />
 
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Welcome Section */}
-        <View style={styles.welcomeCard}>
-          <Text style={styles.welcomeSubtitle}>Bienvenue sur</Text>
-          <Text style={styles.welcomeTitle}>Sira App</Text>
-          <Text style={styles.welcomeDescription}>
-            Votre plateforme de mobilité et de navigation intelligente.
-          </Text>
+      {/* Background: 3D Aerial City Map with Navigation Routes */}
+      <Image
+        source={require('@/assets/images/city-route-3d-bg.jpg')}
+        style={styles.backgroundImage}
+        contentFit="cover"
+        contentPosition={{ top: '0%', left: '50%' }}
+      />
+
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
+        {/* Top Header Bar with Menu / Brand Slogan */}
+        <View style={styles.topHeader}>
+          <View style={styles.sloganRow}>
+            <Text style={styles.sloganBlack}>On trace, </Text>
+            <Text style={styles.sloganOrange}>sans stress.</Text>
+          </View>
         </View>
 
-        {/* Quick Actions Grid */}
-        <Text style={styles.sectionTitle}>Services</Text>
-        <View style={styles.grid}>
-          <TouchableOpacity style={styles.gridCard}>
-            <View style={[styles.iconContainer, { backgroundColor: '#F2652220' }]}>
-              <IconSymbol name="paperplane.fill" size={24} color="#F26522" />
-            </View>
-            <Text style={styles.cardTitle}>Itinéraires</Text>
-            <Text style={styles.cardSubtitle}>Explorer les trajets</Text>
-          </TouchableOpacity>
+        {/* Middle Section: Speech Bubble Greeting + 3D Waving Character */}
+        <View style={styles.centerSection}>
+          {/* Speech / Greeting Bubble */}
+          <View style={styles.speechBubble}>
+            <Text style={styles.speechGreeting}>Salut Diata</Text>
+            <Text style={styles.speechMain}>
+              Je suis <Text style={styles.siraBold}>SIRA</Text>, votre
+            </Text>
+            <Text style={styles.speechSub}>assistant de mobilité.</Text>
+          </View>
 
-          <TouchableOpacity style={styles.gridCard}>
-            <View style={[styles.iconContainer, { backgroundColor: '#38EF7D20' }]}>
-              <IconSymbol name="house.fill" size={24} color="#38EF7D" />
-            </View>
-            <Text style={styles.cardTitle}>Favoris</Text>
-            <Text style={styles.cardSubtitle}>Vos destinations</Text>
-          </TouchableOpacity>
+          {/* 3D Animated Assistant Character (Diata / Sira mascot waving) */}
+          <View style={styles.characterContainer}>
+            <Image
+              source={require('@/assets/images/sira-character-assistant.png')}
+              style={styles.characterImage}
+              contentFit="contain"
+            />
+          </View>
         </View>
-      </ScrollView>
-    </SafeAreaView>
+
+        {/* Bottom Destination Search Bar (Floating Orange Pill) */}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.bottomBarContainer}
+        >
+          <TouchableOpacity
+            style={styles.searchPill}
+            onPress={handleSearchPress}
+            activeOpacity={0.9}
+          >
+            {/* Left Orange Circle with Location Pin */}
+            <View style={styles.searchPinCircle}>
+              <Ionicons name="location-sharp" size={18} color="#FFFFFF" />
+            </View>
+
+            {/* Input / Placeholder Text */}
+            <View style={styles.searchInputWrapper}>
+              <Text style={styles.searchTitle}>Où voulez-vous aller ?</Text>
+              <Text style={styles.searchSubtitle}>Entrez votre destination</Text>
+            </View>
+
+            {/* Right Arrow / Action Icon */}
+            <View style={styles.searchArrowCircle}>
+              <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
+            </View>
+          </TouchableOpacity>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000000',
+    backgroundColor: '#F8F9FA',
   },
-  header: {
+  backgroundImage: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
+  },
+  safeArea: {
+    flex: 1,
+    justifyContent: 'space-between',
+  },
+  topHeader: {
+    paddingHorizontal: 20,
+    paddingTop: 8,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#1F1F1F',
+    justifyContent: 'flex-start',
   },
-  headerLogo: {
-    width: 90,
-    height: 36,
-  },
-  profileButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#1E1E1E',
-    justifyContent: 'center',
+  sloganRow: {
+    flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.85)',
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 14,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  content: {
-    padding: 20,
+  sloganBlack: {
+    color: '#000000',
+    fontSize: 12,
+    fontWeight: '800',
   },
-  welcomeCard: {
-    backgroundColor: '#141414',
-    borderRadius: 20,
-    padding: 24,
-    marginBottom: 24,
-    borderWidth: 1,
-    borderColor: '#262626',
+  sloganOrange: {
+    color: '#F26522',
+    fontSize: 12,
+    fontWeight: '800',
   },
-  welcomeSubtitle: {
-    color: '#888888',
-    fontSize: 14,
+  centerSection: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    position: 'relative',
+    paddingBottom: 20,
+  },
+  speechBubble: {
+    position: 'absolute',
+    top: height * 0.08,
+    left: 24,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    borderRadius: 18,
+    borderBottomLeftRadius: 4,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.18,
+    shadowRadius: 10,
+    elevation: 6,
+    zIndex: 10,
+    maxWidth: width * 0.65,
+  },
+  speechGreeting: {
+    color: '#121212',
+    fontSize: 15,
+    fontWeight: '800',
+    marginBottom: 2,
+  },
+  speechMain: {
+    color: '#333333',
+    fontSize: 13,
     fontWeight: '500',
   },
-  welcomeTitle: {
-    color: '#FFFFFF',
-    fontSize: 28,
-    fontWeight: '800',
-    marginTop: 4,
-    marginBottom: 8,
+  siraBold: {
+    color: '#F26522',
+    fontWeight: '900',
   },
-  welcomeDescription: {
-    color: '#CCCCCC',
-    fontSize: 15,
-    lineHeight: 22,
+  speechSub: {
+    color: '#555555',
+    fontSize: 12.5,
+    fontWeight: '400',
   },
-  sectionTitle: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '700',
-    marginBottom: 16,
+  characterContainer: {
+    width: width * 0.88,
+    height: height * 0.52,
+    alignItems: 'center',
+    justifyContent: 'flex-end',
   },
-  grid: {
+  characterImage: {
+    width: '100%',
+    height: '100%',
+  },
+  bottomBarContainer: {
+    paddingHorizontal: 20,
+    paddingBottom: Platform.OS === 'ios' ? 24 : 32,
+    width: '100%',
+  },
+  searchPill: {
+    backgroundColor: '#F26522',
     flexDirection: 'row',
-    gap: 16,
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 30,
+    shadowColor: '#F26522',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.38,
+    shadowRadius: 12,
+    elevation: 8,
   },
-  gridCard: {
-    flex: 1,
-    backgroundColor: '#141414',
-    borderRadius: 18,
-    padding: 18,
-    borderWidth: 1,
-    borderColor: '#262626',
-  },
-  iconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 14,
+  searchPinCircle: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 12,
   },
-  cardTitle: {
+  searchInputWrapper: {
+    flex: 1,
+    paddingHorizontal: 12,
+  },
+  searchTitle: {
     color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: 14,
+    fontWeight: '800',
   },
-  cardSubtitle: {
-    color: '#777777',
-    fontSize: 13,
-    marginTop: 4,
+  searchSubtitle: {
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 11.5,
+    fontWeight: '400',
+    marginTop: 1,
+  },
+  searchArrowCircle: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
