@@ -8,19 +8,36 @@ import {
   Dimensions,
   KeyboardAvoidingView,
   Platform,
-  ScrollView,
+  Modal,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 
-const { width, height } = Dimensions.get('window');
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+
+// Designer canvas reference metrics (406px x 874px)
+const DESIGN_CANVAS_WIDTH = 406;
+const DESIGN_CANVAS_HEIGHT = 874;
+
+// Character Assistant specs: Width 324px, Height 486px, Top 414px, Left 39px
+const CHARACTER_WIDTH = (324 / DESIGN_CANVAS_WIDTH) * SCREEN_WIDTH;
+const CHARACTER_HEIGHT = (486 / DESIGN_CANVAS_HEIGHT) * SCREEN_HEIGHT;
+const CHARACTER_TOP = (414 / DESIGN_CANVAS_HEIGHT) * SCREEN_HEIGHT;
+const CHARACTER_LEFT = (39 / DESIGN_CANVAS_WIDTH) * SCREEN_WIDTH;
+
+// Search Pill specs: Width 364px, Height 58px, Angle 0deg, Opacity 1, Radius 100px, #F26522
+const SEARCH_PILL_WIDTH = (364 / DESIGN_CANVAS_WIDTH) * SCREEN_WIDTH;
+const SEARCH_PILL_HEIGHT = (58 / DESIGN_CANVAS_HEIGHT) * SCREEN_HEIGHT;
 
 export default function HomeScreen() {
   const router = useRouter();
   const [destination, setDestination] = useState('');
+  const [isFocused, setIsFocused] = useState(false);
+  const [isVoiceModalOpen, setIsVoiceModalOpen] = useState(false);
 
   const handleSearchPress = () => {
     const target = destination.trim();
@@ -34,11 +51,19 @@ export default function HomeScreen() {
     }
   };
 
-  const handleQuickSelect = (place: string) => {
-    setDestination(place);
+  const handleOpenMic = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    setIsVoiceModalOpen(true);
+  };
+
+  const handleVoiceSelect = (phrase: string) => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    setDestination(phrase);
+    setIsVoiceModalOpen(false);
+    setIsFocused(true);
     router.push({
       pathname: '/(tabs)/explore',
-      params: { destination: place, query: place },
+      params: { destination: phrase, query: phrase },
     });
   };
 
@@ -48,40 +73,43 @@ export default function HomeScreen() {
 
       {/* Background: 3D Aerial City Map with Navigation Routes */}
       <Image
-        source={require('@/assets/images/city-route-3d-bg.jpg')}
+        source={require('@/assets/images/city-route-3d-bg.png')}
         style={styles.backgroundImage}
         contentFit="cover"
-        contentPosition={{ top: '0%', left: '50%' }}
       />
 
       <SafeAreaView style={styles.safeArea} edges={['top']}>
-        {/* Top Header Bar with Menu / Brand Slogan */}
+        {/* Top Header Bar with Circular Black Back Button */}
         <View style={styles.topHeader}>
-          <View style={styles.sloganRow}>
-            <Text style={styles.sloganBlack}>On trace, </Text>
-            <Text style={styles.sloganOrange}>sans stress.</Text>
-          </View>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => router.back()}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="arrow-back" size={18} color="#FFFFFF" />
+          </TouchableOpacity>
         </View>
 
-        {/* Middle Section: Speech Bubble Greeting + 3D Waving Character */}
-        <View style={styles.centerSection}>
-          {/* Speech / Greeting Bubble */}
-          <View style={styles.speechBubble}>
-            <Text style={styles.speechGreeting}>Salut Diata</Text>
-            <Text style={styles.speechMain}>
-              Je suis <Text style={styles.siraBold}>SIRA</Text>, votre
-            </Text>
-            <Text style={styles.speechSub}>assistant de mobilité.</Text>
-          </View>
+        {/* Speech / Greeting Bubble (Positioned above character's head with speech pointer tail) */}
+        <View style={styles.speechBubble}>
+          <Text style={styles.speechGreeting}>
+            salut <Text style={styles.speechGreetingBold}>diata</Text>
+          </Text>
+          <Text style={styles.speechMain}>
+            Je suis <Text style={styles.siraBold}>SIRA</Text>, votre
+          </Text>
+          <Text style={styles.speechSub}>assistant de mobilité.</Text>
+          {/* Speech bubble pointer arrow */}
+          <View style={styles.speechBubbleArrow} />
+        </View>
 
-          {/* 3D Animated Assistant Character */}
-          <View style={styles.characterContainer}>
-            <Image
-              source={require('@/assets/images/sira-character-assistant.png')}
-              style={styles.characterImage}
-              contentFit="contain"
-            />
-          </View>
+        {/* 3D Animated Assistant Character - Designer Specs (324x486 at Top: 414px, Left: 39px, Angle: 0deg, Opacity: 1) */}
+        <View style={styles.characterContainer} pointerEvents="none">
+          <Image
+            source={require('@/assets/images/sira-character-assistant.png')}
+            style={styles.characterImage}
+            contentFit="contain"
+          />
         </View>
 
         {/* Bottom Destination Section */}
@@ -89,19 +117,27 @@ export default function HomeScreen() {
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.bottomBarContainer}
         >
-          {/* Destination Search Bar (Floating Orange Pill with TextInput) */}
-          <View style={styles.searchPill}>
-            <View style={styles.searchPinCircle}>
-              <Ionicons name="location-sharp" size={18} color="#FFFFFF" />
-            </View>
+          {/* Destination Search Bar (Floating Pill - Orange inactive / Dark active) */}
+          <View style={[styles.searchPill, isFocused && styles.searchPillFocused]}>
+            {!isFocused && (
+              <View style={styles.searchPinCircle}>
+                <Ionicons name="location-sharp" size={20} color="#F26522" />
+              </View>
+            )}
 
-            <View style={styles.searchInputWrapper}>
+            <View style={[styles.searchInputWrapper, isFocused && styles.searchInputWrapperFocused]}>
               <TextInput
-                style={styles.searchInput}
-                placeholder="Où voulez-vous aller ?"
-                placeholderTextColor="rgba(255, 255, 255, 0.75)"
+                style={[styles.searchInput, isFocused && styles.searchInputFocused]}
+                placeholder={isFocused ? "Entrez votre destination" : "Où voulez-vous aller ?"}
+                placeholderTextColor={isFocused ? "#CCCCCC" : "#FFFFFF"}
                 value={destination}
                 onChangeText={setDestination}
+                onFocus={() => setIsFocused(true)}
+                onBlur={() => {
+                  if (!destination.trim()) {
+                    setIsFocused(false);
+                  }
+                }}
                 onSubmitEditing={handleSearchPress}
                 returnKeyType="search"
                 autoCapitalize="sentences"
@@ -109,7 +145,17 @@ export default function HomeScreen() {
               />
             </View>
 
-            {destination.length > 0 && (
+            {isFocused && (
+              <TouchableOpacity
+                style={styles.micButton}
+                onPress={handleOpenMic}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="mic" size={22} color="#FFFFFF" />
+              </TouchableOpacity>
+            )}
+
+            {!isFocused && destination.length > 0 && (
               <TouchableOpacity
                 style={styles.clearCircle}
                 onPress={() => setDestination('')}
@@ -118,70 +164,70 @@ export default function HomeScreen() {
                 <Ionicons name="close" size={16} color="#FFFFFF" />
               </TouchableOpacity>
             )}
-
-            <TouchableOpacity
-              style={styles.searchArrowCircle}
-              onPress={handleSearchPress}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
-            </TouchableOpacity>
           </View>
-
-          {/* Quick Favorite Place Chips */}
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.quickFavsScrollView}
-            contentContainerStyle={styles.quickFavsContainer}
-          >
-            <TouchableOpacity
-              style={styles.quickFavChip}
-              onPress={() => handleQuickSelect('Abobo Samaké')}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="home" size={13} color="#F26522" />
-              <Text style={styles.quickFavText}>Maison</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.quickFavChip}
-              onPress={() => handleQuickSelect('Orange Digital Center')}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="briefcase" size={13} color="#F26522" />
-              <Text style={styles.quickFavText}>Travail</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.quickFavChip}
-              onPress={() => handleQuickSelect("Gare d'Adjamé")}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="bus" size={13} color="#F26522" />
-              <Text style={styles.quickFavText}>Gare Adjamé</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.quickFavChip}
-              onPress={() => handleQuickSelect('Plateau Immeuble CCIA')}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="location" size={13} color="#F26522" />
-              <Text style={styles.quickFavText}>Plateau</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.quickFavChip}
-              onPress={() => handleQuickSelect('Riviera 3')}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="navigate" size={13} color="#F26522" />
-              <Text style={styles.quickFavText}>Riviera 3</Text>
-            </TouchableOpacity>
-          </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
+
+      {/* SIRA Interactive Voice Recognition Assistant Modal */}
+      <Modal
+        visible={isVoiceModalOpen}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setIsVoiceModalOpen(false)}
+      >
+        <View style={styles.voiceModalOverlay}>
+          <View style={styles.voiceModalContent}>
+            {/* Modal Close Button */}
+            <TouchableOpacity
+              style={styles.voiceCloseButton}
+              onPress={() => setIsVoiceModalOpen(false)}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="close" size={20} color="#FFFFFF" />
+            </TouchableOpacity>
+
+            <Text style={styles.voiceModalTitle}>Assistant Vocal SIRA</Text>
+            <Text style={styles.voiceModalSubtitle}>Dites votre destination à voix haute...</Text>
+
+            {/* Glowing Animated Microphone Circle */}
+            <View style={styles.voiceMicGlowOuter}>
+              <View style={styles.voiceMicGlowInner}>
+                <Ionicons name="mic" size={44} color="#FFFFFF" />
+              </View>
+            </View>
+
+            {/* Live Soundwave Bar Visualizer */}
+            <View style={styles.soundwaveContainer}>
+              <View style={[styles.soundwaveBar, { height: 28 }]} />
+              <View style={[styles.soundwaveBar, { height: 42 }]} />
+              <View style={[styles.soundwaveBar, { height: 56 }]} />
+              <View style={[styles.soundwaveBar, { height: 38 }]} />
+              <View style={[styles.soundwaveBar, { height: 24 }]} />
+            </View>
+
+            {/* Voice Command Quick Suggestions */}
+            <Text style={styles.voiceSuggestLabel}>Exemples de destination :</Text>
+            <View style={styles.voiceChipsContainer}>
+              {[
+                'Orange Digital Center',
+                "Gare d'Adjamé",
+                'Cocody Saint-Jean',
+                'Abobo Samaké',
+              ].map((item) => (
+                <TouchableOpacity
+                  key={item}
+                  style={styles.voiceChip}
+                  onPress={() => handleVoiceSelect(item)}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="location-sharp" size={14} color="#F26522" style={{ marginRight: 6 }} />
+                  <Text style={styles.voiceChipText}>{item}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -205,134 +251,115 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   topHeader: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 18,
     paddingTop: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-start',
+    zIndex: 30,
   },
-  sloganRow: {
-    flexDirection: 'row',
+  backButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#000000',
+    justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.85)',
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderRadius: 14,
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.15,
     shadowRadius: 4,
-    elevation: 2,
-  },
-  sloganBlack: {
-    color: '#000000',
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  sloganOrange: {
-    color: '#F26522',
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  centerSection: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    position: 'relative',
-    paddingBottom: 0,
+    elevation: 3,
   },
   speechBubble: {
     position: 'absolute',
-    top: height * 0.05,
-    left: 24,
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    paddingHorizontal: 18,
-    paddingVertical: 12,
-    borderRadius: 18,
+    top: CHARACTER_TOP - 110,
+    left: 22,
+    backgroundColor: 'rgba(255, 255, 255, 0.78)',
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderRadius: 22,
     borderBottomLeftRadius: 4,
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.18,
     shadowRadius: 10,
     elevation: 6,
-    zIndex: 10,
-    maxWidth: width * 0.65,
+    zIndex: 20,
+    maxWidth: SCREEN_WIDTH * 0.65,
   },
   speechGreeting: {
     color: '#121212',
-    fontSize: 15,
-    fontWeight: '800',
+    fontSize: 16,
+    fontWeight: '400',
     marginBottom: 2,
+  },
+  speechGreetingBold: {
+    fontWeight: '800',
+    color: '#000000',
   },
   speechMain: {
     color: '#333333',
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '500',
+    lineHeight: 19,
   },
   siraBold: {
-    color: '#F26522',
+    color: '#000000',
     fontWeight: '900',
   },
   speechSub: {
-    color: '#555555',
-    fontSize: 12.5,
-    fontWeight: '400',
+    color: '#333333',
+    fontSize: 14,
+    fontWeight: '700',
+    lineHeight: 19,
   },
+  speechBubbleArrow: {
+    position: 'absolute',
+    bottom: -8,
+    left: 24,
+    width: 0,
+    height: 0,
+    borderLeftWidth: 8,
+    borderRightWidth: 8,
+    borderTopWidth: 9,
+    borderStyle: 'solid',
+    backgroundColor: 'transparent',
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderTopColor: 'rgba(255, 255, 255, 0.78)',
+  },
+
+  /* 3D Character Container - Designer Specs (324x486 at Top: 414px, Left: 39px) */
   characterContainer: {
-    width: width * 0.86,
-    height: height * 0.36,
-    alignSelf: 'flex-start',
-    marginLeft: -10,
-    marginBottom: 10,
-    justifyContent: 'flex-end',
+    position: 'absolute',
+    top: CHARACTER_TOP,
+    left: CHARACTER_LEFT,
+    width: CHARACTER_WIDTH,
+    height: CHARACTER_HEIGHT,
+    zIndex: 10,
   },
   characterImage: {
     width: '100%',
     height: '100%',
   },
+
+  /* Bottom Floating Search Bar */
   bottomBarContainer: {
-    paddingHorizontal: 20,
-    paddingBottom: Platform.OS === 'ios' ? 115 : 95,
-    width: '100%',
-  },
-  quickFavsScrollView: {
-    marginTop: 0,
-    maxHeight: 52,
-  },
-  quickFavsContainer: {
-    gap: 10,
+    position: 'absolute',
+    bottom: Platform.OS === 'ios' ? 36 : 24,
+    left: 0,
+    right: 0,
     alignItems: 'center',
-    paddingVertical: 2,
-  },
-  quickFavChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 22,
-    gap: 8,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.14,
-    shadowRadius: 6,
-    elevation: 4,
-    borderWidth: 1,
-    borderColor: 'rgba(242, 101, 34, 0.15)',
-  },
-  quickFavText: {
-    fontSize: 13.5,
-    fontWeight: '700',
-    color: '#1F2937',
+    zIndex: 25,
   },
   searchPill: {
+    width: SEARCH_PILL_WIDTH,
+    height: Math.max(56, SEARCH_PILL_HEIGHT),
     backgroundColor: '#F26522',
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    borderRadius: 30,
-    marginBottom: 12,
+    paddingHorizontal: 8,
+    borderRadius: 100,
+    opacity: 1,
+    transform: [{ rotate: '0deg' }],
     shadowColor: '#F26522',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.38,
@@ -340,23 +367,29 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   searchPinCircle: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#FFFFFF',
     justifyContent: 'center',
     alignItems: 'center',
+    marginLeft: 4,
   },
   searchInputWrapper: {
     flex: 1,
-    paddingHorizontal: 10,
+    paddingHorizontal: 8,
     justifyContent: 'center',
+    alignItems: 'center',
   },
   searchInput: {
+    width: '100%',
     color: '#FFFFFF',
-    fontSize: 15,
+    fontSize: 17,
     fontWeight: '700',
-    paddingVertical: Platform.OS === 'ios' ? 8 : 4,
+    lineHeight: 22,
+    letterSpacing: 0,
+    textAlign: 'center',
+    paddingVertical: Platform.OS === 'ios' ? 4 : 0,
   },
   clearCircle: {
     width: 26,
@@ -367,12 +400,135 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: 6,
   },
-  searchArrowCircle: {
+  searchPillFocused: {
+    backgroundColor: '#333333',
+    paddingHorizontal: 20,
+    shadowColor: '#000000',
+    shadowOpacity: 0.25,
+  },
+  searchInputWrapperFocused: {
+    alignItems: 'flex-start',
+    paddingHorizontal: 0,
+  },
+  searchInputFocused: {
+    fontSize: 16,
+    fontWeight: '500',
+    lineHeight: 22,
+    textAlign: 'left',
+    color: '#FFFFFF',
+  },
+  micButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 8,
+  },
+
+  /* Voice Assistant Modal Styles */
+  voiceModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.82)',
+    justifyContent: 'flex-end',
+  },
+  voiceModalContent: {
+    backgroundColor: '#1E1E1E',
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    paddingHorizontal: 24,
+    paddingTop: 28,
+    paddingBottom: Platform.OS === 'ios' ? 44 : 32,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  voiceCloseButton: {
+    position: 'absolute',
+    top: 20,
+    right: 20,
     width: 34,
     height: 34,
     borderRadius: 17,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  voiceModalTitle: {
+    color: '#FFFFFF',
+    fontSize: 20,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  voiceModalSubtitle: {
+    color: '#AAAAAA',
+    fontSize: 14,
+    fontWeight: '400',
+    marginBottom: 28,
+    textAlign: 'center',
+  },
+  voiceMicGlowOuter: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: 'rgba(242, 101, 34, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  voiceMicGlowInner: {
+    width: 76,
+    height: 76,
+    borderRadius: 38,
+    backgroundColor: '#F26522',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#F26522',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.6,
+    shadowRadius: 16,
+    elevation: 10,
+  },
+  soundwaveContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 28,
+    height: 60,
+  },
+  soundwaveBar: {
+    width: 6,
+    backgroundColor: '#F26522',
+    borderRadius: 3,
+  },
+  voiceSuggestLabel: {
+    color: '#888888',
+    fontSize: 12,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 12,
+    alignSelf: 'flex-start',
+  },
+  voiceChipsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    width: '100%',
+  },
+  voiceChip: {
+    backgroundColor: '#2A2A2A',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  voiceChipText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '500',
   },
 });

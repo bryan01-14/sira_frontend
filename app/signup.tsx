@@ -16,7 +16,23 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-const { width } = Dimensions.get('window');
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+
+// Designer canvas reference metrics (406px x 874px)
+const DESIGN_CANVAS_WIDTH = 406;
+const DESIGN_CANVAS_HEIGHT = 874;
+
+// City Wave Image specs: Width 481px, Height 388px, Top 149px, Left -39px
+const CITY_IMAGE_WIDTH = (481 / DESIGN_CANVAS_WIDTH) * SCREEN_WIDTH;
+const CITY_IMAGE_HEIGHT = (388 / DESIGN_CANVAS_HEIGHT) * SCREEN_HEIGHT;
+const CITY_IMAGE_TOP = (149 / DESIGN_CANVAS_HEIGHT) * SCREEN_HEIGHT;
+const CITY_IMAGE_LEFT = (-39 / DESIGN_CANVAS_WIDTH) * SCREEN_WIDTH;
+
+// Phone Mockup specs: Width 120px, Height 245px, Top 292px, Left 11px
+const PHONE_MOCKUP_WIDTH = (120 / DESIGN_CANVAS_WIDTH) * SCREEN_WIDTH;
+const PHONE_MOCKUP_HEIGHT = (245 / DESIGN_CANVAS_HEIGHT) * SCREEN_HEIGHT;
+const PHONE_MOCKUP_TOP = (292 / DESIGN_CANVAS_HEIGHT) * SCREEN_HEIGHT;
+const PHONE_MOCKUP_LEFT = (11 / DESIGN_CANVAS_WIDTH) * SCREEN_WIDTH;
 
 export default function SignupScreen() {
   const router = useRouter();
@@ -35,11 +51,11 @@ export default function SignupScreen() {
     <View style={styles.container}>
       <StatusBar style="dark" />
 
-      {/* Subtle Background Watermark GPS Path */}
+      {/* Full Screen Light Map Watermark Background */}
       <Image
-        source={require('@/assets/images/pin-path-decor-vector.png')}
+        source={require('@/assets/images/signup-map-bg.png')}
         style={styles.bgWatermarkDecor}
-        contentFit="contain"
+        contentFit="cover"
       />
 
       <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -52,7 +68,7 @@ export default function SignupScreen() {
             bounces={false}
             showsVerticalScrollIndicator={false}
           >
-            {/* Top Navigation Row with Black Back Button and Sira Brand Logo */}
+            {/* Top Navigation Row with Circular Back Arrow and Sira Brand Logo */}
             <View style={styles.topNavHeader}>
               <TouchableOpacity
                 style={styles.backButton}
@@ -78,7 +94,7 @@ export default function SignupScreen() {
               <View style={styles.spacerRight} />
             </View>
 
-            {/* Middle Wave City Picture with iPhone Mockup on the Left over pure white background */}
+            {/* Middle Wave City Picture with iPhone Mockup on the Left */}
             <View style={styles.heroSection}>
               <Image
                 source={require('@/assets/images/signup-wave-city-pure.png')}
@@ -115,7 +131,7 @@ export default function SignupScreen() {
                 <TextInput
                   style={styles.textInput}
                   placeholder="Prenom"
-                  placeholderTextColor="#888888"
+                  placeholderTextColor="#B0B0B0"
                   value={firstName}
                   onChangeText={setFirstName}
                 />
@@ -129,7 +145,7 @@ export default function SignupScreen() {
                 <TextInput
                   style={styles.textInput}
                   placeholder="Entrez votre numéro Orange"
-                  placeholderTextColor="#888888"
+                  placeholderTextColor="#B0B0B0"
                   keyboardType="phone-pad"
                   value={phone}
                   onChangeText={setPhone}
@@ -144,18 +160,6 @@ export default function SignupScreen() {
               >
                 <Text style={styles.signupButtonText}>S'INSCRIRE</Text>
               </TouchableOpacity>
-
-              {/* Switch to Login Link */}
-              <TouchableOpacity
-                style={styles.switchAuthButton}
-                onPress={handleGoToLogin}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.switchAuthText}>
-                  Déjà un compte ?{' '}
-                  <Text style={styles.switchAuthHighlight}>SE CONNECTER</Text>
-                </Text>
-              </TouchableOpacity>
             </View>
           </ScrollView>
         </KeyboardAvoidingView>
@@ -167,7 +171,7 @@ export default function SignupScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#FAFAFA',
     position: 'relative',
   },
   safeArea: {
@@ -175,11 +179,13 @@ const styles = StyleSheet.create({
   },
   bgWatermarkDecor: {
     position: 'absolute',
-    top: 10,
-    right: -10,
-    width: width * 0.95,
-    height: 380,
-    opacity: 0.12,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
+    opacity: 0.30,
     zIndex: 0,
   },
   keyboardView: {
@@ -199,9 +205,9 @@ const styles = StyleSheet.create({
     zIndex: 5,
   },
   backButton: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: '#000000',
     justifyContent: 'center',
     alignItems: 'center',
@@ -212,7 +218,7 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   spacerRight: {
-    width: 34,
+    width: 36,
   },
   headerLogoContainer: {
     alignItems: 'center',
@@ -225,39 +231,46 @@ const styles = StyleSheet.create({
   headerTaglineRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 4,
+    marginTop: 2,
   },
   taglineBlack: {
     color: '#111111',
-    fontSize: 10.5,
-    fontWeight: '900',
-    letterSpacing: 0.8,
+    fontSize: 14,
+    fontWeight: '500',
+    lineHeight: 15,
+    letterSpacing: 0,
+    fontVariant: ['small-caps'],
+    textTransform: 'uppercase',
   },
   taglineOrange: {
     color: '#F26522',
-    fontSize: 10.5,
-    fontWeight: '900',
-    letterSpacing: 0.8,
+    fontSize: 14,
+    fontWeight: '500',
+    lineHeight: 15,
+    letterSpacing: 0,
+    fontVariant: ['small-caps'],
+    textTransform: 'uppercase',
   },
   heroSection: {
     width: '100%',
-    height: 310,
+    height: CITY_IMAGE_HEIGHT,
     position: 'relative',
     marginVertical: 4,
-    justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
     overflow: 'visible',
   },
   waveCityImage: {
-    width: '100%',
-    height: '100%',
+    position: 'absolute',
+    left: CITY_IMAGE_LEFT,
+    top: 0,
+    width: CITY_IMAGE_WIDTH,
+    height: CITY_IMAGE_HEIGHT,
   },
   mockupContainer: {
     position: 'absolute',
-    left: 14,
-    bottom: 22,
-    width: 124,
-    height: 216,
+    left: PHONE_MOCKUP_LEFT,
+    bottom: 12,
+    width: PHONE_MOCKUP_WIDTH,
+    height: PHONE_MOCKUP_HEIGHT,
     zIndex: 15,
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 6 },
@@ -279,26 +292,30 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   welcomeTitle: {
-    color: '#111111',
-    fontSize: 21,
-    fontWeight: '900',
-    letterSpacing: 0.5,
+    color: '#000000',
+    fontSize: 24,
+    fontWeight: '700',
+    lineHeight: 28,
+    letterSpacing: 0,
     textAlign: 'center',
+    textTransform: 'uppercase',
+    fontVariant: ['small-caps'],
   },
   orangeText: {
     color: '#F26522',
   },
   welcomeSubtitle: {
-    color: '#555555',
-    fontSize: 13,
-    lineHeight: 18,
+    color: '#000000',
+    fontSize: 16,
+    fontWeight: '500',
+    lineHeight: 20,
+    letterSpacing: 0,
     textAlign: 'center',
     marginTop: 6,
-    fontWeight: '500',
   },
   inputWrapper: {
     width: '100%',
-    backgroundColor: '#353535',
+    backgroundColor: '#333333',
     borderRadius: 25,
     flexDirection: 'row',
     alignItems: 'center',
@@ -318,41 +335,31 @@ const styles = StyleSheet.create({
   textInput: {
     flex: 1,
     color: '#FFFFFF',
-    fontSize: 13.5,
-    fontWeight: '600',
+    fontSize: 13,
+    fontWeight: '400',
+    lineHeight: 20,
+    letterSpacing: 0,
     paddingVertical: 8,
   },
   signupButton: {
     backgroundColor: '#F26522',
-    paddingHorizontal: 40,
+    minWidth: 140,
+    paddingHorizontal: 36,
     paddingVertical: 12,
-    borderRadius: 20,
+    borderRadius: 25,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 8,
+    marginTop: 10,
     shadowColor: '#F26522',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
+    shadowOpacity: 0.35,
     shadowRadius: 8,
-    elevation: 6,
+    elevation: 5,
   },
   signupButtonText: {
     color: '#FFFFFF',
-    fontSize: 12.5,
-    fontWeight: '900',
-    letterSpacing: 0.6,
-  },
-  switchAuthButton: {
-    marginTop: 18,
-    paddingVertical: 6,
-  },
-  switchAuthText: {
-    color: '#8E8E8E',
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  switchAuthHighlight: {
-    color: '#F26522',
+    fontSize: 13,
     fontWeight: '800',
+    letterSpacing: 0.6,
   },
 });

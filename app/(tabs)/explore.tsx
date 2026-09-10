@@ -18,7 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 const { width, height } = Dimensions.get('window');
 
 type TransportMode = 'Coulé' | 'Debout' | 'Suspendu';
-type FilterType = 'Tout' | 'Marche' | 'Bus' | 'Taxi';
+type FilterType = 'Tout' | 'Marche' | 'Bus' | 'Gbaka' | 'Yôrô-Yôrô';
 
 interface RouteOption {
   id: string;
@@ -71,7 +71,6 @@ export default function RouteExploreScreen() {
         { type: 'walk', duration: '5 min' },
         { type: 'bus', duration: '7 min' },
         { type: 'walk', duration: '9 min' },
-        { type: 'bus', duration: '...' },
       ],
       trafficStatus: 'Trafic modéré',
       distance: '18 Km',
@@ -102,16 +101,17 @@ export default function RouteExploreScreen() {
       mode: 'Suspendu',
       subtext: 'Confort',
       steps: [
-        { type: 'walk', duration: '3 min' },
-        { type: 'taxi', duration: '15 min' },
-        { type: 'walk', duration: '2 min' },
+        { type: 'walk', duration: '5 min' },
+        { type: 'bus', duration: '7 min' },
+        { type: 'walk', duration: '9 min' },
+        { type: 'bus', duration: '3 min' },
       ],
-      trafficStatus: 'Trafic fluide',
+      trafficStatus: 'Trafic modéré',
       distance: '18 Km',
-      durationMinutes: '18',
-      costRange: 'entre 2.000F et 3.500F',
+      durationMinutes: '24',
+      costRange: 'entre 500F et 1.500F',
       departureTime: '09H30',
-      arrivalTime: '09H48',
+      arrivalTime: '10H30',
     },
   ];
 
@@ -126,13 +126,21 @@ export default function RouteExploreScreen() {
     if (activeFilter === 'Tout') return true;
     if (activeFilter === 'Marche') return opt.steps.some((s) => s.type === 'walk');
     if (activeFilter === 'Bus') return opt.steps.some((s) => s.type === 'bus');
-    if (activeFilter === 'Taxi') return opt.steps.some((s) => s.type === 'taxi');
+    if (activeFilter === 'Gbaka') return opt.steps.some((s) => s.type === 'bus');
+    if (activeFilter === 'Yôrô-Yôrô') return opt.steps.some((s) => s.type === 'taxi');
     return true;
   });
 
   return (
     <View style={styles.container}>
       <StatusBar style="dark" />
+
+      {/* Background Light Map Canvas */}
+      <Image
+        source={require('@/assets/images/explore-map-bg.png')}
+        style={styles.backgroundImage}
+        contentFit="cover"
+      />
 
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         {/* Top Header Bar */}
@@ -233,7 +241,7 @@ export default function RouteExploreScreen() {
             style={styles.filtersScrollView}
             contentContainerStyle={styles.filtersContentContainer}
           >
-            {(['Tout', 'Marche', 'Bus', 'Taxi'] as FilterType[]).map((filterItem) => {
+            {(['Tout', 'Marche', 'Bus', 'Gbaka', 'Yôrô-Yôrô'] as FilterType[]).map((filterItem) => {
               const isActive = activeFilter === filterItem;
               const iconName: keyof typeof Ionicons.glyphMap =
                 filterItem === 'Tout'
@@ -241,6 +249,8 @@ export default function RouteExploreScreen() {
                   : filterItem === 'Marche'
                   ? 'walk'
                   : filterItem === 'Bus'
+                  ? 'bus'
+                  : filterItem === 'Gbaka'
                   ? 'bus'
                   : 'car';
 
@@ -298,20 +308,7 @@ export default function RouteExploreScreen() {
             />
           </View>
 
-          {/* Section Header Bar above Route Options */}
-          <View style={styles.sectionHeaderBar}>
-            <View style={styles.sectionHeaderLeft}>
-              <View style={styles.sectionHeaderIconCircle}>
-                <Ionicons name="navigate" size={14} color="#FFFFFF" />
-              </View>
-              <Text style={styles.sectionHeaderTitle}>Itinéraires proposés</Text>
-            </View>
-            <View style={styles.sectionHeaderBadge}>
-              <Text style={styles.sectionHeaderBadgeText}>{filteredRouteOptions.length}</Text>
-            </View>
-          </View>
-
-          {/* Route Options Result Cards (Coulé, Debout, Suspendu) */}
+          {/* Route Options Result Cards (Coulé, Debout, Suspendu) - Designer Spec (Width 389, Height 256, Gap 11px) */}
           <View style={styles.resultsContainer}>
             {filteredRouteOptions.map((option) => (
               <View
@@ -321,55 +318,57 @@ export default function RouteExploreScreen() {
                   selectedMode === option.mode && styles.resultCardHighlighted,
                 ]}
               >
-                {/* Header: Mode Title & Traffic Stats */}
-                <View style={styles.resultCardTopRow}>
+                {/* Row 1: Mode Title (Left) & Traffic Status (Right) */}
+                <View style={styles.cardRow1}>
                   <Text style={styles.resultModeTitle}>{option.mode}</Text>
-
-                  <View style={styles.resultRightStats}>
-                    <View style={styles.trafficRow}>
-                      <Ionicons name="bus-outline" size={14} color="#000000" />
-                      <Text style={styles.trafficText}>{option.trafficStatus}</Text>
-                    </View>
-                    <Text style={styles.distanceText}>sur {option.distance}</Text>
-                    <View style={styles.durationWrapper}>
-                      <Text style={styles.durationPrefix}>en </Text>
-                      <Text style={styles.durationBold}>{option.durationMinutes}</Text>
-                      <Text style={styles.durationUnit}> min</Text>
-                    </View>
+                  <View style={styles.trafficRow}>
+                    <Ionicons name="car-sport" size={15} color="#000000" />
+                    <Text style={styles.trafficText}>{option.trafficStatus}</Text>
                   </View>
                 </View>
 
-                {/* Steps Pills Row */}
-                <View style={styles.stepsPillsRow}>
-                  {option.steps.map((step, sIdx) => (
-                    <React.Fragment key={sIdx}>
-                      <View style={styles.stepTag}>
-                        <Ionicons
-                          name={step.type === 'walk' ? 'walk' : step.type === 'bus' ? 'bus' : 'car'}
-                          size={12}
-                          color="#FFFFFF"
-                        />
-                        <Text style={styles.stepTagText}>{step.duration}</Text>
-                      </View>
-                      {sIdx < option.steps.length - 1 && (
-                        <Text style={styles.stepSeparator}>-</Text>
-                      )}
-                    </React.Fragment>
-                  ))}
+                {/* Row 2: Step Badges (Left) & Distance (Right) */}
+                <View style={styles.cardRow2}>
+                  <View style={styles.stepsPillsRow}>
+                    {option.steps.map((step, sIdx) => (
+                      <React.Fragment key={sIdx}>
+                        <View style={styles.stepTag}>
+                          <Ionicons
+                            name={step.type === 'walk' ? 'walk' : step.type === 'bus' ? 'bus' : 'car'}
+                            size={11}
+                            color="#FFFFFF"
+                          />
+                          <Text style={styles.stepTagText}>{step.duration}</Text>
+                        </View>
+                        {sIdx < option.steps.length - 1 && (
+                          <Text style={styles.stepSeparator}>- -</Text>
+                        )}
+                      </React.Fragment>
+                    ))}
+                  </View>
+                  <Text style={styles.distanceText}>
+                    sur <Text style={styles.boldText}>{option.distance}</Text>
+                  </Text>
                 </View>
 
-                {/* Bottom Row: Cost, Times & Detail Button */}
-                <View style={styles.resultCardBottomRow}>
-                  <View style={styles.priceTimeCol}>
-                    <Text style={styles.costText}>
-                      Coût : <Text style={styles.boldText}>{option.costRange}</Text>
-                    </Text>
-                    <Text style={styles.timesText}>
-                      Départ : <Text style={styles.boldText}>{option.departureTime}</Text> • Arrivée :{' '}
-                      <Text style={styles.boldText}>{option.arrivalTime}</Text>
-                    </Text>
+                {/* Row 3: Cost (Left) & Duration (Right) */}
+                <View style={styles.cardRow3}>
+                  <Text style={styles.costText}>
+                    Coût : entre <Text style={styles.boldText}>500F</Text> et <Text style={styles.boldText}>1.500F</Text>
+                  </Text>
+                  <View style={styles.durationWrapper}>
+                    <Text style={styles.durationPrefix}>en </Text>
+                    <Text style={styles.durationBold}>{option.durationMinutes}</Text>
+                    <Text style={styles.durationUnit}> min</Text>
                   </View>
+                </View>
 
+                {/* Row 4: Departure & Arrival Times (Left) & Detail Button (Right) */}
+                <View style={styles.cardRow4}>
+                  <Text style={styles.timesText}>
+                    Depart : <Text style={styles.boldText}>{option.departureTime}</Text> Arrivée :{' '}
+                    <Text style={styles.boldText}>{option.arrivalTime}</Text>
+                  </Text>
                   <TouchableOpacity
                     style={styles.detailPillBtn}
                     onPress={() =>
@@ -380,7 +379,9 @@ export default function RouteExploreScreen() {
                     }
                     activeOpacity={0.85}
                   >
-                    <Ionicons name="add" size={16} color="#FFFFFF" />
+                    <View style={styles.plusIconCircle}>
+                      <Ionicons name="add" size={10} color="#F26522" />
+                    </View>
                     <Text style={styles.detailPillBtnText}>Detail</Text>
                   </TouchableOpacity>
                 </View>
@@ -659,6 +660,15 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FAFAFA',
   },
+  backgroundImage: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
+  },
   safeArea: {
     flex: 1,
   },
@@ -715,42 +725,44 @@ const styles = StyleSheet.create({
   },
   routeInputCard: {
     marginHorizontal: 16,
-    marginTop: 4,
+    marginTop: 2,
     backgroundColor: '#FFFFFF',
-    borderRadius: 14,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
     flexDirection: 'row',
     alignItems: 'center',
     shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 6,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 1,
+    borderWidth: 1,
+    borderColor: '#EEEEEE',
   },
   routeTimelineCol: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 10,
+    marginRight: 6,
   },
   deptRingDot: {
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    borderWidth: 2,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    borderWidth: 1.5,
     borderColor: '#F26522',
     justifyContent: 'center',
     alignItems: 'center',
   },
   deptInnerDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 2.5,
+    width: 3.5,
+    height: 3.5,
+    borderRadius: 1.75,
     backgroundColor: '#F26522',
   },
   verticalDottedLine: {
     width: 1,
-    height: 20,
+    height: 10,
     borderWidth: 1,
     borderColor: '#CCCCCC',
     borderStyle: 'dashed',
@@ -760,30 +772,30 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   inputItemRow: {
-    paddingVertical: 1,
+    paddingVertical: 0,
   },
   inputLabel: {
-    fontSize: 10.5,
+    fontSize: 9.5,
     color: '#888888',
     fontWeight: '500',
   },
   inputValueInput: {
-    fontSize: 13,
+    fontSize: 11.5,
     color: '#000000',
-    fontWeight: '800',
-    marginTop: 0,
+    fontWeight: '700',
+    marginTop: -3,
     padding: 0,
   },
   cardInputDivider: {
     height: 1,
     backgroundColor: '#EEEEEE',
-    marginVertical: 4,
+    marginVertical: 1.5,
   },
   swapButton: {
-    padding: 6,
-    marginLeft: 6,
+    padding: 4,
+    marginLeft: 4,
     backgroundColor: '#FFF4EE',
-    borderRadius: 16,
+    borderRadius: 12,
   },
   filtersScrollView: {
     marginTop: 4,
@@ -926,81 +938,66 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   resultsContainer: {
-    marginHorizontal: 16,
-    marginTop: 12,
-    gap: 8,
+    paddingHorizontal: 12,
+    paddingTop: 6,
+    paddingBottom: 14,
+    gap: 7,
   },
   resultCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 10,
+    backgroundColor: '#FAFAFA',
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
     shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 5,
-    elevation: 2,
-    borderWidth: 1.5,
-    borderColor: '#EEEEEE',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 2,
+    elevation: 1,
   },
   resultCardHighlighted: {
     borderColor: '#F26522',
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-    elevation: 3,
+    backgroundColor: '#FFFFFF',
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  resultCardTopRow: {
+  cardRow1: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    alignItems: 'center',
+    marginBottom: 2,
+  },
+  cardRow2: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 2,
+  },
+  cardRow3: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 2,
+  },
+  cardRow4: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 1,
   },
   resultModeTitle: {
-    fontSize: 15,
-    fontWeight: '900',
-    color: '#000000',
-  },
-  resultRightStats: {
-    alignItems: 'flex-end',
-  },
-  trafficRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-  },
-  trafficText: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#000000',
-  },
-  distanceText: {
-    fontSize: 10,
-    color: '#666666',
-    marginTop: 1,
-  },
-  durationWrapper: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    marginTop: 1,
-  },
-  durationPrefix: {
-    fontSize: 11,
-    color: '#000000',
-    fontWeight: '600',
-  },
-  durationBold: {
-    fontSize: 19,
-    fontWeight: '900',
-    color: '#000000',
-  },
-  durationUnit: {
-    fontSize: 12,
+    fontSize: 14.5,
     fontWeight: '800',
     color: '#000000',
   },
   stepsPillsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    marginTop: 6,
+    gap: 3,
+    marginTop: 4,
+    marginBottom: 4,
     flexWrap: 'wrap',
   },
   stepTag: {
@@ -1008,42 +1005,71 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#F26522',
     paddingHorizontal: 7,
-    paddingVertical: 2.5,
-    borderRadius: 10,
+    paddingVertical: 2,
+    borderRadius: 8,
     gap: 3,
   },
   stepTagText: {
     color: '#FFFFFF',
     fontSize: 10,
-    fontWeight: '800',
+    fontWeight: '700',
   },
   stepSeparator: {
-    color: '#888888',
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  resultCardBottomRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
-    marginTop: 8,
-    paddingTop: 6,
-    borderTopWidth: 1,
-    borderTopColor: '#F2F2F2',
-  },
-  priceTimeCol: {
-    flex: 1,
+    color: '#333333',
+    fontSize: 9.5,
+    fontWeight: '700',
   },
   costText: {
-    fontSize: 10,
+    fontSize: 10.5,
     color: '#333333',
+    lineHeight: 14,
   },
   timesText: {
-    fontSize: 10,
+    fontSize: 10.5,
     color: '#333333',
+    lineHeight: 14,
     marginTop: 1,
   },
   boldText: {
+    fontWeight: '700',
+    color: '#000000',
+  },
+  resultRightStats: {
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+  },
+  trafficRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  trafficText: {
+    fontSize: 11.5,
+    fontWeight: '800',
+    color: '#000000',
+  },
+  distanceText: {
+    fontSize: 10.5,
+    color: '#333333',
+    marginTop: 1,
+  },
+  durationWrapper: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    marginVertical: 2,
+  },
+  durationPrefix: {
+    fontSize: 11,
+    color: '#000000',
+    fontWeight: '500',
+  },
+  durationBold: {
+    fontSize: 19,
+    fontWeight: '900',
+    color: '#000000',
+  },
+  durationUnit: {
+    fontSize: 11.5,
     fontWeight: '800',
     color: '#000000',
   },
@@ -1052,19 +1078,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#F26522',
     paddingHorizontal: 10,
-    paddingVertical: 4.5,
-    borderRadius: 14,
-    gap: 3,
+    paddingVertical: 4,
+    borderRadius: 16,
+    gap: 4,
     shadowColor: '#F26522',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.22,
     shadowRadius: 3,
     elevation: 2,
   },
+  plusIconCircle: {
+    width: 13,
+    height: 13,
+    borderRadius: 6.5,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   detailPillBtnText: {
     color: '#FFFFFF',
-    fontSize: 10.5,
-    fontWeight: '800',
+    fontSize: 11,
+    fontWeight: '700',
   },
   detailModalOverlay: {
     ...StyleSheet.absoluteFill,
@@ -1149,7 +1183,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   fullDecompositionContainer: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: '#FFFFFF',
     zIndex: 150,
   },

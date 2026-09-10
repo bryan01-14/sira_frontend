@@ -16,6 +16,21 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 const { width, height } = Dimensions.get('window');
 
+// Designer canvas reference metrics (406px x 874px)
+const DESIGN_CANVAS_WIDTH = 406;
+const DESIGN_CANVAS_HEIGHT = 874;
+
+// Phone placement: Width 225px, Height 523px, Top 157px, Left 177px
+const PHONE_WIDTH = (225 / DESIGN_CANVAS_WIDTH) * width;
+const PHONE_HEIGHT = (523 / DESIGN_CANVAS_HEIGHT) * height;
+const PHONE_TOP = (157 / DESIGN_CANVAS_HEIGHT) * height;
+const PHONE_LEFT = (177 / DESIGN_CANVAS_WIDTH) * width;
+
+// Information Card placement: Width 402px, Height 242px, Top 632px, Opacity 90%, Color #010101
+const CARD_WIDTH = (402 / DESIGN_CANVAS_WIDTH) * width;
+const CARD_HEIGHT = (242 / DESIGN_CANVAS_HEIGHT) * height;
+const CARD_TOP = (632 / DESIGN_CANVAS_HEIGHT) * height;
+
 interface OnboardingSlide {
   id: string;
   title: string;
@@ -100,7 +115,7 @@ export default function OnboardingScreen() {
   const renderSlide = ({ item }: { item: OnboardingSlide }) => {
     return (
       <View style={styles.slide}>
-        {/* Layer 1: Background Image with visible bridge tower on the left */}
+        {/* Layer 1: Background Image */}
         <Image
           source={item.heroBgImage}
           style={styles.heroBgImage}
@@ -112,13 +127,14 @@ export default function OnboardingScreen() {
         {/* Layer 2: Black bottom card backdrop */}
         <View style={styles.slideBottomBackdrop} />
 
-        {/* Layer 3: Phone Mockup on Slide 1 - Rendered in FRONT of the black background */}
+        {/* Layer 3: Phone Mockup on Slide 1 - Positioned with exact designer specs (225x523 at Top: 157, Left: 177) */}
         {item.phoneMockupImage && (
           <View style={styles.phoneMockupContainer}>
             <Image
               source={item.phoneMockupImage}
               style={styles.phoneMockupImage}
-              contentFit="contain"
+              contentFit="cover"
+              contentPosition={{ top: '0%', left: '0%' }}
             />
           </View>
         )}
@@ -259,24 +275,25 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.02)',
   },
 
-  /* Layer 2: Slide Bottom Black Backdrop */
+  /* Layer 2: Slide Bottom Information Card Backdrop - Designer Specs (Width 402px, Height 242px, Top 632px, Opacity 90%, #010101) */
   slideBottomBackdrop: {
     position: 'absolute',
-    bottom: 0,
+    top: CARD_TOP,
     left: 0,
     right: 0,
-    height: height * 0.34,
-    backgroundColor: '#000000',
+    height: CARD_HEIGHT,
+    backgroundColor: '#010101',
+    opacity: 0.90,
     zIndex: 5,
   },
 
-  /* Layer 3: Phone Mockup in FRONT of black backdrop */
+  /* Layer 3: Phone Mockup in FRONT of black backdrop - Designer Specs (225x523 at Top: 157, Left: 177) */
   phoneMockupContainer: {
     position: 'absolute',
-    right: -width * 0.16,
-    top: height * 0.05,
-    width: width * 0.85,
-    height: height * 0.74,
+    left: PHONE_LEFT,
+    top: PHONE_TOP,
+    width: PHONE_WIDTH,
+    height: PHONE_HEIGHT,
     zIndex: 15,
     shadowColor: '#000000',
     shadowOffset: { width: -8, height: 14 },
@@ -292,12 +309,14 @@ const styles = StyleSheet.create({
   /* Layer 4: Bottom Sheet UI Content */
   bottomCardContent: {
     position: 'absolute',
-    bottom: 0,
+    top: CARD_TOP,
     left: 0,
     right: 0,
-    paddingHorizontal: 20,
-    paddingTop: 18,
-    paddingBottom: 38,
+    height: CARD_HEIGHT,
+    paddingHorizontal: 22,
+    paddingTop: 16,
+    paddingBottom: 24,
+    justifyContent: 'space-between',
     zIndex: 30,
   },
 
@@ -309,70 +328,79 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   progressPill: {
-    height: 5,
-    borderRadius: 2.5,
+    height: 6,
+    borderRadius: 3,
   },
   progressPillActive: {
     width: 44,
     backgroundColor: '#F26522',
   },
   progressPillInactive: {
-    width: 5,
+    width: 6,
     backgroundColor: '#FFFFFF',
     opacity: 0.95,
   },
 
-  /* Title: Heavy Uppercase Font */
+  /* Title: Designer specs - Font Montserrat 19px, LineHeight 23px, Weight 700 (Bold), Small Caps, White */
   titleText: {
     color: '#FFFFFF',
-    fontSize: 21,
-    fontWeight: '900',
-    letterSpacing: 0.4,
-    lineHeight: 27,
-    marginBottom: 8,
+    fontSize: 19,
+    fontWeight: '700',
+    letterSpacing: 0,
+    lineHeight: 23,
+    marginBottom: 6,
     textTransform: 'uppercase',
+    fontVariant: ['small-caps'],
   },
 
-  /* Subtitle */
+  /* Subtitle: Designer specs - Font 13px, LineHeight 17px, Weight 500 (Medium), White */
   descriptionText: {
-    color: '#C5C5C5',
-    fontSize: 14,
-    fontWeight: '400',
-    lineHeight: 20,
-    marginBottom: 22,
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '500',
+    letterSpacing: 0,
+    lineHeight: 17,
+    marginBottom: 16,
   },
 
   /* Actions Row */
   actionsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 10,
   },
+
+  /* Button "S'INSCRIRE": Rayon 25px, Background #F26522 */
   registerButton: {
     backgroundColor: '#F26522',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 20,
+    minWidth: 95,
+    height: 34,
+    paddingHorizontal: 14,
+    borderRadius: 25,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   registerButtonText: {
     color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '900',
-    letterSpacing: 0.6,
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.3,
   },
+
+  /* Link "SE CONNECTER" */
   loginButton: {
-    paddingVertical: 6,
+    paddingVertical: 4,
     flex: 1,
     justifyContent: 'center',
   },
   loginPrefixText: {
-    color: '#A8A8A8',
+    color: '#FFFFFF',
     fontSize: 11,
     fontWeight: '500',
   },
   loginOrangeText: {
     color: '#F26522',
-    fontWeight: '900',
-    letterSpacing: 0.4,
+    fontWeight: '700',
+    letterSpacing: 0.3,
   },
 });

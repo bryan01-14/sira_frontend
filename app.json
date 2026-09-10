@@ -28,12 +28,12 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/sira-logo-transparent.png",
-          "imageWidth": 180,
+          "image": "./assets/images/sira-logo-white-designer.png",
+          "imageWidth": 173,
           "resizeMode": "contain",
-          "backgroundColor": "#000000",
+          "backgroundColor": "#010101",
           "dark": {
-            "backgroundColor": "#000000"
+            "backgroundColor": "#010101"
           }
         }
       ],

@@ -743,7 +743,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   feedbackModalOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',

@@ -16,7 +16,35 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-const { width } = Dimensions.get('window');
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+
+// Designer canvas reference metrics (406px x 874px)
+const DESIGN_CANVAS_WIDTH = 406;
+const DESIGN_CANVAS_HEIGHT = 874;
+
+// Diagonal Road Stripe specs: Width 450px, Height 138px, Top 126px, Left -20px
+const ROAD_STRIPE_WIDTH = (450 / DESIGN_CANVAS_WIDTH) * SCREEN_WIDTH;
+const ROAD_STRIPE_HEIGHT = (138 / DESIGN_CANVAS_HEIGHT) * SCREEN_HEIGHT;
+const ROAD_STRIPE_TOP = (126 / DESIGN_CANVAS_HEIGHT) * SCREEN_HEIGHT;
+const ROAD_STRIPE_LEFT = (-20 / DESIGN_CANVAS_WIDTH) * SCREEN_WIDTH;
+
+// Tagline Slogan Row specs: Width 325.1px, Height 111.47px, Top 107px, Left 42px, Angle 0deg
+const SLOGAN_WIDTH = (325.1 / DESIGN_CANVAS_WIDTH) * SCREEN_WIDTH;
+const SLOGAN_HEIGHT = (111.47 / DESIGN_CANVAS_HEIGHT) * SCREEN_HEIGHT;
+const SLOGAN_TOP = (107 / DESIGN_CANVAS_HEIGHT) * SCREEN_HEIGHT;
+const SLOGAN_LEFT = (42 / DESIGN_CANVAS_WIDTH) * SCREEN_WIDTH;
+
+// Location Pin specs: Width 42.03px, Height 55.38px, Top 107px, Left 313px, Angle 13.89deg
+const PIN_WIDTH = (42.03 / DESIGN_CANVAS_WIDTH) * SCREEN_WIDTH;
+const PIN_HEIGHT = (55.38 / DESIGN_CANVAS_HEIGHT) * SCREEN_HEIGHT;
+const PIN_TOP = (107 / DESIGN_CANVAS_HEIGHT) * SCREEN_HEIGHT;
+const PIN_LEFT = (313 / DESIGN_CANVAS_WIDTH) * SCREEN_WIDTH;
+
+// White Sira Logo specs: Width 105px, Height 107px, Top 270px, Left 148px
+const WHITE_LOGO_WIDTH = (105 / DESIGN_CANVAS_WIDTH) * SCREEN_WIDTH;
+const WHITE_LOGO_HEIGHT = (107 / DESIGN_CANVAS_HEIGHT) * SCREEN_HEIGHT;
+const WHITE_LOGO_TOP = (270 / DESIGN_CANVAS_HEIGHT) * SCREEN_HEIGHT;
+const WHITE_LOGO_LEFT = (148 / DESIGN_CANVAS_WIDTH) * SCREEN_WIDTH;
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -55,6 +83,28 @@ export default function LoginScreen() {
           </TouchableOpacity>
         </View>
 
+        {/* Diagonal Road Stripe Image (Top: 126px, Left: -20px, 450x138) */}
+        <View style={styles.roadStripeContainer} pointerEvents="none">
+          <Image
+            source={require('@/assets/images/road-stripe-designer.png')}
+            style={styles.roadStripeImage}
+            contentFit="contain"
+          />
+        </View>
+
+        {/* Tagline Slogan Row (Top: 107px, Left: 42px, 325x111 at -13.72deg) */}
+        <View style={styles.sloganRow} pointerEvents="none">
+          <Text style={styles.sloganWhite}>ON TRACE, </Text>
+          <Text style={styles.sloganOrange}>SANS STRESS.</Text>
+        </View>
+
+        {/* Location Pin Icon (Top: 107px, Left: 313px, 42x55 at 13.89deg) */}
+        <Image
+          source={require('@/assets/images/orange-pin-icon.png')}
+          style={styles.pinImageStandalone}
+          contentFit="contain"
+        />
+
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.keyboardView}
@@ -64,28 +114,10 @@ export default function LoginScreen() {
             bounces={false}
             showsVerticalScrollIndicator={false}
           >
-            {/* Top Diagonal Road Stripe Banner with Orange Slogan and Official Pin */}
-            <View style={styles.roadStripeContainer}>
-              <Image
-                source={require('@/assets/images/road-stripe-vector.png')}
-                style={styles.roadStripeImage}
-                contentFit="contain"
-              />
-              <View style={styles.sloganRow}>
-                <Text style={styles.sloganWhite}>ON TRACE, </Text>
-                <Text style={styles.sloganOrange}>SANS STRESS.</Text>
-                <Image
-                  source={require('@/assets/images/orange-pin-icon.png')}
-                  style={styles.pinImage}
-                  contentFit="contain"
-                />
-              </View>
-            </View>
-
             {/* Sira Brand White Logo */}
             <View style={styles.logoContainer}>
               <Image
-                source={require('@/assets/images/sira-logo-white.png')}
+                source={require('@/assets/images/sira-logo-white-designer.png')}
                 style={styles.logoImage}
                 contentFit="contain"
               />
@@ -97,11 +129,13 @@ export default function LoginScreen() {
               <Text style={styles.titleLine2}>
                 DE <Text style={styles.titleOrange}>VOUS REVOIR</Text>
               </Text>
+
+              {/* Formatted subtitle matching designer text styling */}
               <Text style={styles.subtitle}>
                 Votre mobilité à Abidjan vous attend.{'\n'}
-                Entrez votre numéro Orange{'\n'}
+                <Text style={styles.subtitleBold}>Entrez votre numéro Orange</Text>{'\n'}
                 pour accéder à votre compte{'\n'}
-                et retrouver votre expérience SIRA.
+                et <Text style={styles.subtitleBold}>retrouver votre expérience SIRA.</Text>
               </Text>
             </View>
 
@@ -113,7 +147,7 @@ export default function LoginScreen() {
               <TextInput
                 style={styles.textInput}
                 placeholder="07 XX XX XX XX"
-                placeholderTextColor="#888888"
+                placeholderTextColor="#AAAAAA"
                 keyboardType="phone-pad"
                 value={phone}
                 onChangeText={setPhone}
@@ -127,18 +161,6 @@ export default function LoginScreen() {
               activeOpacity={0.85}
             >
               <Text style={styles.loginButtonText}>SE CONNECTER</Text>
-            </TouchableOpacity>
-
-            {/* Switch to Signup Link */}
-            <TouchableOpacity
-              style={styles.switchAuthButton}
-              onPress={handleGoToSignup}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.switchAuthText}>
-                Pas encore de compte ?{' '}
-                <Text style={styles.switchAuthHighlight}>S'INSCRIRE</Text>
-              </Text>
             </TouchableOpacity>
           </ScrollView>
         </KeyboardAvoidingView>
@@ -167,7 +189,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(8, 8, 8, 0.86)',
+    backgroundColor: 'rgba(5, 5, 5, 0.90)',
   },
   safeArea: {
     flex: 1,
@@ -180,9 +202,9 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   backButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     backgroundColor: '#F26522',
     justifyContent: 'center',
     alignItems: 'center',
@@ -197,101 +219,118 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: 28,
-    paddingTop: 4,
+    paddingTop: ROAD_STRIPE_TOP + ROAD_STRIPE_HEIGHT * 0.45,
     paddingBottom: 35,
     alignItems: 'center',
   },
   roadStripeContainer: {
-    width: width,
-    alignItems: 'center',
-    marginVertical: 12,
-    position: 'relative',
-    height: 85,
-    justifyContent: 'center',
-    alignSelf: 'center',
+    position: 'absolute',
+    top: ROAD_STRIPE_TOP,
+    left: ROAD_STRIPE_LEFT,
+    width: ROAD_STRIPE_WIDTH,
+    height: ROAD_STRIPE_HEIGHT,
+    zIndex: 1,
   },
   roadStripeImage: {
-    position: 'absolute',
-    width: width * 1.5,
-    height: 60,
-    transform: [{ rotate: '-9.5deg' }],
+    width: '100%',
+    height: '100%',
   },
   sloganRow: {
+    position: 'absolute',
+    top: SLOGAN_TOP + 12,
+    left: SLOGAN_LEFT - 22,
+    width: SLOGAN_WIDTH,
+    height: SLOGAN_HEIGHT,
     flexDirection: 'row',
     alignItems: 'center',
-    transform: [{ rotate: '-9.5deg' }],
-    zIndex: 5,
-    paddingHorizontal: 8,
+    justifyContent: 'center',
+    transform: [{ rotate: '-13.72deg' }],
+    zIndex: 10,
   },
   sloganWhite: {
     color: '#FFFFFF',
-    fontSize: 17,
-    fontWeight: '900',
-    letterSpacing: 0.8,
+    fontSize: 18.5,
+    fontWeight: '500',
+    lineHeight: 20,
+    letterSpacing: 0,
+    fontVariant: ['small-caps'],
+    textTransform: 'uppercase',
   },
   sloganOrange: {
     color: '#F26522',
-    fontSize: 17,
-    fontWeight: '900',
-    letterSpacing: 0.8,
+    fontSize: 18.5,
+    fontWeight: '500',
+    lineHeight: 20,
+    letterSpacing: 0,
+    fontVariant: ['small-caps'],
+    textTransform: 'uppercase',
   },
-  pinImage: {
-    width: 32,
-    height: 42,
-    marginLeft: 8,
-    marginBottom: 10,
+  pinImageStandalone: {
+    position: 'absolute',
+    top: PIN_TOP,
+    left: PIN_LEFT,
+    width: PIN_WIDTH,
+    height: PIN_HEIGHT,
+    transform: [{ rotate: '-13.89deg' }],
+    zIndex: 15,
   },
   logoContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 22,
-    marginBottom: 22,
+    marginTop: 10,
+    marginBottom: 16,
   },
   logoImage: {
-    width: 175,
-    height: 88,
+    width: WHITE_LOGO_WIDTH,
+    height: WHITE_LOGO_HEIGHT,
   },
   textContainer: {
     alignItems: 'center',
-    marginBottom: 30,
+    marginBottom: 24,
   },
   titleLine1: {
     color: '#FFFFFF',
     fontSize: 22,
-    fontWeight: '900',
-    letterSpacing: 0.5,
+    fontWeight: '700',
+    letterSpacing: 0,
     textAlign: 'center',
+    textTransform: 'uppercase',
+    fontVariant: ['small-caps'],
   },
   titleLine2: {
     color: '#FFFFFF',
     fontSize: 22,
-    fontWeight: '900',
-    letterSpacing: 0.5,
+    fontWeight: '700',
+    letterSpacing: 0,
     textAlign: 'center',
     marginTop: 2,
+    textTransform: 'uppercase',
+    fontVariant: ['small-caps'],
   },
   titleOrange: {
     color: '#F26522',
   },
   subtitle: {
-    color: '#C0C0C0',
+    color: '#E0E0E0',
     fontSize: 13,
-    lineHeight: 20,
+    lineHeight: 19,
     textAlign: 'center',
-    marginTop: 12,
+    marginTop: 10,
     fontWeight: '400',
+  },
+  subtitleBold: {
+    color: '#FFFFFF',
+    fontWeight: '700',
   },
   inputWrapper: {
     width: '100%',
-    backgroundColor: '#353535',
+    backgroundColor: '#333333',
     borderRadius: 25,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 8,
     paddingVertical: 5,
-    marginBottom: 26,
-    borderWidth: 1,
-    borderColor: '#424242',
+    marginBottom: 20,
   },
   iconCircle: {
     width: 36,
@@ -305,40 +344,33 @@ const styles = StyleSheet.create({
   textInput: {
     flex: 1,
     color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 13,
+    fontWeight: '400',
+    lineHeight: 20,
+    letterSpacing: 0,
     paddingVertical: 8,
   },
   loginButton: {
     backgroundColor: '#F26522',
-    paddingHorizontal: 38,
+    minWidth: 140,
+    paddingHorizontal: 32,
     paddingVertical: 12,
-    borderRadius: 20,
+    borderRadius: 25,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#F26522',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.35,
     shadowRadius: 8,
-    elevation: 6,
+    elevation: 5,
   },
   loginButtonText: {
     color: '#FFFFFF',
-    fontSize: 12.5,
-    fontWeight: '900',
-    letterSpacing: 0.6,
-  },
-  switchAuthButton: {
-    marginTop: 24,
-    paddingVertical: 8,
-  },
-  switchAuthText: {
-    color: '#8E8E8E',
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  switchAuthHighlight: {
-    color: '#F26522',
-    fontWeight: '800',
+    fontSize: 14,
+    fontWeight: '700',
+    lineHeight: 20,
+    letterSpacing: 0,
+    fontVariant: ['small-caps'],
+    textTransform: 'uppercase',
   },
 });
