@@ -57,6 +57,14 @@ export default function RootLayout() {
         />
 
         <Stack.Screen
+          name="navigation-active"
+          options={{
+            headerShown: false,
+            animation: 'fade',
+          }}
+        />
+
+        <Stack.Screen
           name="modal"
           options={{
             presentation: 'modal',

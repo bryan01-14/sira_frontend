@@ -1,17 +1,17 @@
-import React, { useEffect } from 'react';
-import { StyleSheet, View, Dimensions } from 'react-native';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { useEffect } from 'react';
+import { Dimensions, StyleSheet, View } from 'react-native';
 import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withTiming,
-  withSpring,
-  withSequence,
-  withDelay,
   Easing,
   runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withDelay,
+  withSequence,
+  withSpring,
+  withTiming,
 } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -33,7 +33,7 @@ export default function SplashScreen() {
     // 1. Logo entry animation
     logoOpacity.value = withTiming(1, { duration: 900, easing: Easing.out(Easing.cubic) });
     logoScale.value = withSpring(1, { damping: 14, stiffness: 100 });
-    
+
     // 2. Glow effect behind the orange pin
     glowOpacity.value = withDelay(
       400,
@@ -67,7 +67,7 @@ export default function SplashScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar style="light" />
-      
+
       {/* Background subtle orange glow */}
       <Animated.View style={[styles.glowEffect, animatedGlowStyle]} />
 

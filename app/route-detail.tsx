@@ -1,17 +1,17 @@
-import React, { useState } from 'react';
-import {
-  StyleSheet,
-  View,
-  Text,
-  TouchableOpacity,
-  ScrollView,
-  Dimensions,
-} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { useState } from 'react';
+import {
+  Dimensions,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
 
 const { width, height } = Dimensions.get('window');
 
@@ -254,7 +254,12 @@ export default function RouteDetailScreen() {
               {/* Floating Orange Start Itinerary FAB Button */}
               <TouchableOpacity
                 style={styles.startFabButton}
-                onPress={() => setShowFeedback(true)}
+                onPress={() =>
+                  router.push({
+                    pathname: '/navigation-active',
+                    params: { destination: arrival },
+                  })
+                }
                 activeOpacity={0.85}
               >
                 <View style={styles.startFabInnerCircle}>
