@@ -1,15 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   StyleSheet,
   View,
   Text,
+  TextInput,
   TouchableOpacity,
   ScrollView,
   Dimensions,
   Platform,
 } from 'react-native';
 import { Image } from 'expo-image';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -17,300 +18,588 @@ import { Ionicons } from '@expo/vector-icons';
 const { width, height } = Dimensions.get('window');
 
 type TransportMode = 'Coulé' | 'Debout' | 'Suspendu';
+type FilterType = 'Tout' | 'Marche' | 'Bus' | 'Taxi';
 
-interface RouteStep {
+interface RouteOption {
   id: string;
-  type: 'walk' | 'bus' | 'taxi';
-  title: string;
-  duration: string;
-  description: string;
-  timeRange: string;
-  distanceOrCost: string;
-  icon: keyof typeof Ionicons.glyphMap;
+  mode: TransportMode;
+  subtext: string;
+  steps: { type: 'walk' | 'bus' | 'taxi'; duration: string }[];
+  trafficStatus: string;
+  distance: string;
+  durationMinutes: string;
+  costRange: string;
+  departureTime: string;
+  arrivalTime: string;
 }
 
 export default function RouteExploreScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ query?: string; destination?: string }>();
+
+  // State for Departure & Arrival (Dynamic from query params or manual entry)
+  const [departure, setDeparture] = useState('Abobo Samaké');
+  const [arrival, setArrival] = useState('Orange Digital Center');
+
   const [selectedMode, setSelectedMode] = useState<TransportMode>('Coulé');
+  const [activeFilter, setActiveFilter] = useState<FilterType>('Tout');
   const [showDetail, setShowDetail] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
   const [rating, setRating] = useState(5);
 
-  const routeSteps: RouteStep[] = [
+  // Sync incoming search params from Home screen into arrival state
+  useEffect(() => {
+    const incoming = params.query || params.destination;
+    if (incoming && incoming.trim().length > 0) {
+      setArrival(incoming.trim());
+    }
+  }, [params.query, params.destination]);
+
+  // Swap Departure and Arrival locations
+  const handleSwapLocations = () => {
+    const temp = departure;
+    setDeparture(arrival);
+    setArrival(temp);
+  };
+
+  const routeOptions: RouteOption[] = [
     {
-      id: '1',
-      type: 'walk',
-      title: 'Marchez pendant 6 min',
-      duration: '6 min',
-      description: "Depuis Abobo Terminus jusqu'à Gare d'Adjamé.",
-      timeRange: '09:20 → 09:26',
-      distanceOrCost: '450 m',
-      icon: 'walk',
+      id: 'coule-1',
+      mode: 'Coulé',
+      subtext: 'Moindre cher',
+      steps: [
+        { type: 'walk', duration: '5 min' },
+        { type: 'bus', duration: '7 min' },
+        { type: 'walk', duration: '9 min' },
+        { type: 'bus', duration: '...' },
+      ],
+      trafficStatus: 'Trafic modéré',
+      distance: '18 Km',
+      durationMinutes: '24',
+      costRange: 'entre 500F et 1.500F',
+      departureTime: '09H30',
+      arrivalTime: '10H30',
     },
     {
-      id: '2',
-      type: 'bus',
-      title: 'Prenez le Bus 22 pendant 20 min',
-      duration: '20 min',
-      description:
-        "Direction Riviera Palmeraie.\nMontez à Gare d'Adjamé et descendez au Rond-Point de la Riviera.",
-      timeRange: '09:26 → 09:46',
-      distanceOrCost: 'Coût estimé : 200 FCFA',
-      icon: 'bus',
+      id: 'debout-1',
+      mode: 'Debout',
+      subtext: 'Standard',
+      steps: [
+        { type: 'walk', duration: '5 min' },
+        { type: 'bus', duration: '7 min' },
+        { type: 'walk', duration: '9 min' },
+        { type: 'bus', duration: '3 min' },
+      ],
+      trafficStatus: 'Trafic modéré',
+      distance: '18 Km',
+      durationMinutes: '24',
+      costRange: 'entre 500F et 1.500F',
+      departureTime: '09H30',
+      arrivalTime: '10H30',
     },
     {
-      id: '3',
-      type: 'taxi',
-      title: 'Prenez un taxi pendant 7 min',
-      duration: '7 min',
-      description: "Depuis le Rond-Point de la Riviera jusqu'à Cocody Riviera 3.",
-      timeRange: '09:46 → 09:53',
-      distanceOrCost: 'Coût estimé : 1 000 FCFA • 3,2 km',
-      icon: 'car',
-    },
-    {
-      id: '4',
-      type: 'walk',
-      title: 'Marchez pendant 5 min',
-      duration: '5 min',
-      description: "Il ne vous reste plus qu'à marcher jusqu'à votre destination.",
-      timeRange: '09:53 → 09:58',
-      distanceOrCost: '350 m',
-      icon: 'walk',
+      id: 'suspendu-1',
+      mode: 'Suspendu',
+      subtext: 'Confort',
+      steps: [
+        { type: 'walk', duration: '3 min' },
+        { type: 'taxi', duration: '15 min' },
+        { type: 'walk', duration: '2 min' },
+      ],
+      trafficStatus: 'Trafic fluide',
+      distance: '18 Km',
+      durationMinutes: '18',
+      costRange: 'entre 2.000F et 3.500F',
+      departureTime: '09H30',
+      arrivalTime: '09H48',
     },
   ];
+
+  const modesList: { name: TransportMode; subtitle: string; icon: keyof typeof Ionicons.glyphMap; isVip?: boolean }[] = [
+    { name: 'Coulé', subtitle: 'Moindre cher', icon: 'people' },
+    { name: 'Debout', subtitle: 'Standard', icon: 'sparkles' },
+    { name: 'Suspendu', subtitle: 'Confort', icon: 'trophy', isVip: true },
+  ];
+
+  // Filter options based on active selection
+  const filteredRouteOptions = routeOptions.filter((opt) => {
+    if (activeFilter === 'Tout') return true;
+    if (activeFilter === 'Marche') return opt.steps.some((s) => s.type === 'walk');
+    if (activeFilter === 'Bus') return opt.steps.some((s) => s.type === 'bus');
+    if (activeFilter === 'Taxi') return opt.steps.some((s) => s.type === 'taxi');
+    return true;
+  });
 
   return (
     <View style={styles.container}>
       <StatusBar style="dark" />
 
-      {/* Background Map */}
-      <Image
-        source={require('@/assets/images/city-route-3d-bg.jpg')}
-        style={styles.mapBackground}
-        contentFit="cover"
-        contentPosition={{ top: '10%', left: '50%' }}
-      />
-
       <SafeAreaView style={styles.safeArea} edges={['top']}>
-        {/* Top Header with Back Button and Brand */}
-        <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => (showDetail ? setShowDetail(false) : router.back())}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="arrow-back" size={20} color="#000000" />
-          </TouchableOpacity>
-
-          <View style={styles.brandContainer}>
+        {/* Top Header Bar */}
+        <View style={styles.topHeader}>
+          <View style={styles.logoRow}>
+            <TouchableOpacity onPress={() => router.back()} activeOpacity={0.7} style={styles.backBtnWrapper}>
+              <Ionicons name="arrow-back" size={20} color="#000000" />
+            </TouchableOpacity>
             <Image
-              source={require('@/assets/images/sira-logo-vector.png')}
-              style={styles.headerLogo}
+              source={require('@/assets/images/sira-logo-official.png')}
+              style={styles.logoImage}
               contentFit="contain"
             />
-            <Text style={styles.headerSlogan}>On trace, sans stress.</Text>
           </View>
 
-          <TouchableOpacity
-            style={styles.menuButton}
-            onPress={() => setShowFeedback(true)}
-            activeOpacity={0.8}
+          <View style={styles.headerRightActions}>
+            {/* Notification Bell with Red Badge "5" */}
+            <TouchableOpacity
+              style={styles.headerIconButton}
+              onPress={() => setShowFeedback(true)}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="notifications" size={22} color="#000000" />
+              <View style={styles.notificationBadge}>
+                <Text style={styles.badgeText}>5</Text>
+              </View>
+            </TouchableOpacity>
+
+            {/* Hamburger Menu */}
+            <TouchableOpacity style={styles.headerIconButton} activeOpacity={0.8}>
+              <Ionicons name="menu" size={24} color="#000000" />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <ScrollView
+          style={styles.mainScrollView}
+          contentContainerStyle={styles.mainScrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Departure & Arrival Card (Interactive Editable Inputs + Swap) */}
+          <View style={styles.routeInputCard}>
+            <View style={styles.routeTimelineCol}>
+              {/* Departure Dot (Orange ring with inner dot) */}
+              <View style={styles.deptRingDot}>
+                <View style={styles.deptInnerDot} />
+              </View>
+              {/* Dotted Vertical Line */}
+              <View style={styles.verticalDottedLine} />
+              {/* Arrival Orange Location Pin */}
+              <Ionicons name="location-sharp" size={20} color="#F26522" />
+            </View>
+
+            <View style={styles.routeInputsCol}>
+              {/* Departure Row */}
+              <View style={styles.inputItemRow}>
+                <Text style={styles.inputLabel}>Départ</Text>
+                <TextInput
+                  style={styles.inputValueInput}
+                  value={departure}
+                  onChangeText={setDeparture}
+                  placeholder="Lieu de départ"
+                  placeholderTextColor="#999999"
+                  returnKeyType="done"
+                />
+              </View>
+
+              <View style={styles.cardInputDivider} />
+
+              {/* Arrival Row */}
+              <View style={styles.inputItemRow}>
+                <Text style={styles.inputLabel}>Arrivée</Text>
+                <TextInput
+                  style={styles.inputValueInput}
+                  value={arrival}
+                  onChangeText={setArrival}
+                  placeholder="Lieu d'arrivée"
+                  placeholderTextColor="#999999"
+                  returnKeyType="done"
+                />
+              </View>
+            </View>
+
+            {/* Interactive Swap Button */}
+            <TouchableOpacity
+              style={styles.swapButton}
+              onPress={handleSwapLocations}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="swap-vertical" size={22} color="#F26522" />
+            </TouchableOpacity>
+          </View>
+
+          {/* Horizontal Transport Filter Chips Row */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.filtersScrollView}
+            contentContainerStyle={styles.filtersContentContainer}
           >
-            <Ionicons name="notifications-outline" size={20} color="#000000" />
-          </TouchableOpacity>
-        </View>
-
-        {/* Departure -> Arrival Card */}
-        <View style={styles.routeCard}>
-          <View style={styles.routeRow}>
-            <View style={styles.dotGreen} />
-            <View style={styles.routeTextCol}>
-              <Text style={styles.routeLabel}>Départ</Text>
-              <Text style={styles.routeValue}>Abobo Samaké</Text>
-            </View>
-          </View>
-
-          <View style={styles.routeDivider} />
-
-          <View style={styles.routeRow}>
-            <View style={styles.dotOrange} />
-            <View style={styles.routeTextCol}>
-              <Text style={styles.routeLabel}>Arrivée</Text>
-              <Text style={styles.routeValue}>Orange Digital Center</Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Transport Option Tabs (Coulé, Debout, Suspendu) */}
-        {!showDetail && (
-          <View style={styles.modeTabs}>
-            {(['Coulé', 'Debout', 'Suspendu'] as TransportMode[]).map((mode) => {
-              const isSelected = selectedMode === mode;
-              const subtext =
-                mode === 'Coulé'
-                  ? 'Moindre cher'
-                  : mode === 'Debout'
-                  ? 'Standard'
-                  : 'Confort';
+            {(['Tout', 'Marche', 'Bus', 'Taxi'] as FilterType[]).map((filterItem) => {
+              const isActive = activeFilter === filterItem;
+              const iconName: keyof typeof Ionicons.glyphMap =
+                filterItem === 'Tout'
+                  ? 'grid'
+                  : filterItem === 'Marche'
+                  ? 'walk'
+                  : filterItem === 'Bus'
+                  ? 'bus'
+                  : 'car';
 
               return (
                 <TouchableOpacity
-                  key={mode}
-                  style={[styles.modeTab, isSelected && styles.modeTabActive]}
-                  onPress={() => setSelectedMode(mode)}
-                  activeOpacity={0.85}
+                  key={filterItem}
+                  style={[styles.filterChip, isActive && styles.filterChipActive]}
+                  onPress={() => setActiveFilter(filterItem)}
+                  activeOpacity={0.8}
                 >
-                  <Text
-                    style={[
-                      styles.modeTabText,
-                      isSelected && styles.modeTabTextActive,
-                    ]}
-                  >
-                    {mode}
-                  </Text>
-                  <Text
-                    style={[
-                      styles.modeTabSub,
-                      isSelected && styles.modeTabSubActive,
-                    ]}
-                  >
-                    {subtext}
+                  <Ionicons
+                    name={iconName}
+                    size={14}
+                    color={isActive ? '#FFFFFF' : '#333333'}
+                  />
+                  <Text style={[styles.filterChipText, isActive && styles.filterChipTextActive]}>
+                    {filterItem}
                   </Text>
                 </TouchableOpacity>
               );
             })}
+          </ScrollView>
+
+          {/* 3 Main Mode Selection Cards (Black Cards) */}
+          <View style={styles.modeCardsRow}>
+            {modesList.map((modeItem) => {
+              const isSelected = selectedMode === modeItem.name;
+              return (
+                <TouchableOpacity
+                  key={modeItem.name}
+                  style={[
+                    styles.modeCard,
+                    isSelected && styles.modeCardActive,
+                  ]}
+                  onPress={() => setSelectedMode(modeItem.name)}
+                  activeOpacity={0.85}
+                >
+                  <Ionicons name={modeItem.icon} size={17} color="#FFFFFF" />
+                  <View style={styles.modeCardTextWrapper}>
+                    {modeItem.isVip && <Text style={styles.vipBadgeText}>VIP</Text>}
+                    <Text style={styles.modeCardTitle}>{modeItem.name}</Text>
+                    <Text style={styles.modeCardSub}>{modeItem.subtitle}</Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          {/* Enlarged Map Display View (Height increased for maximum readability) */}
+          <View style={styles.mapContainer}>
+            <Image
+              source={require('@/assets/images/map-abidjan-routes.png')}
+              style={styles.mapImage}
+              contentFit="contain"
+            />
+          </View>
+
+          {/* Section Header Bar above Route Options */}
+          <View style={styles.sectionHeaderBar}>
+            <View style={styles.sectionHeaderLeft}>
+              <View style={styles.sectionHeaderIconCircle}>
+                <Ionicons name="navigate" size={14} color="#FFFFFF" />
+              </View>
+              <Text style={styles.sectionHeaderTitle}>Itinéraires proposés</Text>
+            </View>
+            <View style={styles.sectionHeaderBadge}>
+              <Text style={styles.sectionHeaderBadgeText}>{filteredRouteOptions.length}</Text>
+            </View>
+          </View>
+
+          {/* Route Options Result Cards (Coulé, Debout, Suspendu) */}
+          <View style={styles.resultsContainer}>
+            {filteredRouteOptions.map((option) => (
+              <View
+                key={option.id}
+                style={[
+                  styles.resultCard,
+                  selectedMode === option.mode && styles.resultCardHighlighted,
+                ]}
+              >
+                {/* Header: Mode Title & Traffic Stats */}
+                <View style={styles.resultCardTopRow}>
+                  <Text style={styles.resultModeTitle}>{option.mode}</Text>
+
+                  <View style={styles.resultRightStats}>
+                    <View style={styles.trafficRow}>
+                      <Ionicons name="bus-outline" size={14} color="#000000" />
+                      <Text style={styles.trafficText}>{option.trafficStatus}</Text>
+                    </View>
+                    <Text style={styles.distanceText}>sur {option.distance}</Text>
+                    <View style={styles.durationWrapper}>
+                      <Text style={styles.durationPrefix}>en </Text>
+                      <Text style={styles.durationBold}>{option.durationMinutes}</Text>
+                      <Text style={styles.durationUnit}> min</Text>
+                    </View>
+                  </View>
+                </View>
+
+                {/* Steps Pills Row */}
+                <View style={styles.stepsPillsRow}>
+                  {option.steps.map((step, sIdx) => (
+                    <React.Fragment key={sIdx}>
+                      <View style={styles.stepTag}>
+                        <Ionicons
+                          name={step.type === 'walk' ? 'walk' : step.type === 'bus' ? 'bus' : 'car'}
+                          size={12}
+                          color="#FFFFFF"
+                        />
+                        <Text style={styles.stepTagText}>{step.duration}</Text>
+                      </View>
+                      {sIdx < option.steps.length - 1 && (
+                        <Text style={styles.stepSeparator}>-</Text>
+                      )}
+                    </React.Fragment>
+                  ))}
+                </View>
+
+                {/* Bottom Row: Cost, Times & Detail Button */}
+                <View style={styles.resultCardBottomRow}>
+                  <View style={styles.priceTimeCol}>
+                    <Text style={styles.costText}>
+                      Coût : <Text style={styles.boldText}>{option.costRange}</Text>
+                    </Text>
+                    <Text style={styles.timesText}>
+                      Départ : <Text style={styles.boldText}>{option.departureTime}</Text> • Arrivée :{' '}
+                      <Text style={styles.boldText}>{option.arrivalTime}</Text>
+                    </Text>
+                  </View>
+
+                  <TouchableOpacity
+                    style={styles.detailPillBtn}
+                    onPress={() =>
+                      router.push({
+                        pathname: '/route-detail',
+                        params: { departure, arrival, mode: option.mode },
+                      })
+                    }
+                    activeOpacity={0.85}
+                  >
+                    <Ionicons name="add" size={16} color="#FFFFFF" />
+                    <Text style={styles.detailPillBtnText}>Detail</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ))}
+          </View>
+        </ScrollView>
+
+        {/* Full-Screen Detailed Itinerary Breakdown ("Décomposition d'itinéraire") */}
+        {showDetail && (
+          <View style={styles.fullDecompositionContainer}>
+            {/* Top Header Bar */}
+            <View style={styles.decompHeaderBar}>
+              <TouchableOpacity
+                onPress={() => setShowDetail(false)}
+                style={styles.backBtnWrapper}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="arrow-back" size={24} color="#000000" />
+              </TouchableOpacity>
+
+              <Text style={styles.decompHeaderTitle}>Décomposition d'itinéraire</Text>
+
+              <View style={styles.decompHeaderRightIcons}>
+                <TouchableOpacity
+                  style={styles.headerIconButton}
+                  onPress={() => setShowFeedback(true)}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="notifications" size={22} color="#000000" />
+                  <View style={styles.notificationBadge}>
+                    <Text style={styles.badgeText}>5</Text>
+                  </View>
+                </TouchableOpacity>
+
+                <TouchableOpacity style={styles.headerIconButton} activeOpacity={0.8}>
+                  <Ionicons name="warning" size={22} color="#ED1C24" />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Top Half: Interactive Map Section */}
+            <View style={styles.decompMapSection}>
+              <Image
+                source={require('@/assets/images/city-route-3d-bg.jpg')}
+                style={styles.decompMapImage}
+                contentFit="cover"
+              />
+
+              {/* Map Route Legend (Top Right) */}
+              <View style={styles.mapLegendCard}>
+                <View style={styles.legendRowItem}>
+                  <View style={[styles.legendLineBar, { backgroundColor: '#F26522' }]} />
+                  <Ionicons name="star" size={14} color="#F26522" />
+                </View>
+                <View style={styles.legendRowItem}>
+                  <View style={[styles.legendLineBar, { backgroundColor: '#1E6091' }]} />
+                  <Ionicons name="ribbon" size={14} color="#1E6091" />
+                </View>
+              </View>
+
+              {/* Map Traffic Alerts */}
+              <View style={[styles.mapTrafficCallout, styles.accidentCallout]}>
+                <Ionicons name="warning-outline" size={14} color="#E53E3E" />
+                <View>
+                  <Text style={styles.accidentTitle}>Accident</Text>
+                  <Text style={styles.accidentSub}>circulation ralentie</Text>
+                </View>
+              </View>
+
+              <View style={[styles.mapTrafficCallout, styles.routePerturbeeCallout]}>
+                <Ionicons name="construct-outline" size={14} color="#F26522" />
+                <Text style={styles.routePerturbeeText}>Route perturbée</Text>
+              </View>
+
+              {/* Station Badges on Map */}
+              <View style={styles.departStationBadge}>
+                <Text style={styles.departTag}>DÉPART</Text>
+                <Text style={styles.departName}>Abobo Sanmake</Text>
+              </View>
+
+              {/* Floating Orange Navigation Compass Button */}
+              <TouchableOpacity style={styles.mapCompassFab} activeOpacity={0.85}>
+                <Ionicons name="navigate" size={22} color="#FFFFFF" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Bottom Half: Detailed Timeline Itinerary Breakdown */}
+            <ScrollView
+              style={styles.decompScrollView}
+              contentContainerStyle={styles.decompScrollContent}
+              showsVerticalScrollIndicator={false}
+            >
+              <View style={styles.decompTimelineRowLayout}>
+                {/* Left Vertical Dashed Line Bar */}
+                <View style={styles.timelineDashedLine} />
+
+                {/* Timeline Steps */}
+                <View style={styles.timelineStepsCol}>
+                  {/* Step 1: Walk */}
+                  <View style={styles.stepItemRow}>
+                    <View style={styles.stepCircleIcon}>
+                      <Ionicons name="walk" size={18} color="#FFFFFF" />
+                    </View>
+                    <View style={styles.stepInfoCol}>
+                      <Text style={styles.stepTitleText}>Marchez pendant 6 min</Text>
+                      <Text style={styles.stepDescText}>
+                        Depuis Abobo Terminus jusqu'à <Text style={styles.boldText}>Gare d'Adjamé</Text>.
+                      </Text>
+                      <Text style={styles.stepMetaText}>09:20 → 09:26 • 450 m</Text>
+                    </View>
+                  </View>
+
+                  {/* Step 2: Bus 22 */}
+                  <View style={styles.stepItemRow}>
+                    <View style={styles.stepCircleIcon}>
+                      <Ionicons name="bus" size={18} color="#FFFFFF" />
+                    </View>
+                    <View style={styles.stepInfoCol}>
+                      <Text style={styles.stepTitleText}>Prenez le Bus 22 pendant 20 min</Text>
+                      <Text style={styles.stepDescText}>
+                        Direction <Text style={styles.boldText}>Riviera Palmeraie</Text>.
+                      </Text>
+                      <Text style={styles.stepDescText}>
+                        Montez à <Text style={styles.boldText}>Gare d'Adjamé</Text> et descendez au <Text style={styles.boldText}>Rond-Point de la Riviera</Text>.
+                      </Text>
+                      <Text style={styles.stepCostText}>Coût estimé : 200 FCFA</Text>
+                      <Text style={styles.stepMetaText}>09:26 → 09:46</Text>
+                    </View>
+                  </View>
+
+                  {/* Step 3: Taxi */}
+                  <View style={styles.stepItemRow}>
+                    <View style={styles.stepCircleIcon}>
+                      <Ionicons name="car" size={18} color="#FFFFFF" />
+                    </View>
+                    <View style={styles.stepInfoCol}>
+                      <Text style={styles.stepTitleText}>Prenez un taxi pendant 7 min</Text>
+                      <Text style={styles.stepDescText}>
+                        Depuis le <Text style={styles.boldText}>Rond-Point de la Riviera</Text> jusqu'à <Text style={styles.boldText}>Cocody Riviera 3</Text>.
+                      </Text>
+                      <Text style={styles.stepCostText}>Coût estimé : 1 000 FCFA</Text>
+                      <Text style={styles.stepMetaText}>09:46 → 09:53 • 3,2 km</Text>
+                    </View>
+                  </View>
+
+                  {/* Step 4: Walk */}
+                  <View style={styles.stepItemRow}>
+                    <View style={styles.stepCircleIcon}>
+                      <Ionicons name="walk" size={18} color="#FFFFFF" />
+                    </View>
+                    <View style={styles.stepInfoCol}>
+                      <Text style={styles.stepTitleText}>Marchez pendant 5 min</Text>
+                      <Text style={styles.stepDescText}>
+                        Il ne vous reste plus qu'à marcher jusqu'à votre destination.
+                      </Text>
+                      <Text style={styles.stepMetaText}>09:53 → 09:58 • 350 m</Text>
+                    </View>
+                  </View>
+
+                  {/* Step 5: Destination Pin */}
+                  <View style={styles.stepItemRow}>
+                    <View style={[styles.stepCircleIcon, { backgroundColor: '#F26522' }]}>
+                      <Ionicons name="location-sharp" size={18} color="#FFFFFF" />
+                    </View>
+                    <View style={styles.stepInfoCol}>
+                      <Text style={styles.destTitleText}>{arrival || 'Orange Digital Center'}</Text>
+                      <Text style={styles.stepDescText}>
+                        Vous êtes bien arrivé ! Votre trajet est terminé.
+                      </Text>
+                      <View style={styles.destActionsRow}>
+                        <TouchableOpacity style={styles.actionIconBtn} activeOpacity={0.7}>
+                          <Ionicons name="thumbs-up-outline" size={18} color="#222222" />
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.actionIconBtn} activeOpacity={0.7}>
+                          <Ionicons name="share-social-outline" size={18} color="#222222" />
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.actionIconBtn} activeOpacity={0.7}>
+                          <Ionicons name="bookmark-outline" size={18} color="#222222" />
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  </View>
+                </View>
+
+                {/* Floating Assistant Speech Bubble + Character + Start Button (Right Side) */}
+                <View style={styles.assistantColumn}>
+                  {/* Floating Speech Bubble */}
+                  <View style={styles.floatingBubbleBox}>
+                    <Text style={styles.bubbleText}>
+                      Voici comment <Text style={styles.bubbleBoldText}>vous</Text> allez <Text style={styles.bubbleBoldText}>rejoindre</Text> votre destination.
+                    </Text>
+                  </View>
+
+                  {/* 3D Character Assistant pointing hand to timeline */}
+                  <Image
+                    source={require('@/assets/images/sira-character-assistant.png')}
+                    style={styles.pointingCharacterImg}
+                    contentFit="contain"
+                  />
+
+                  {/* Orange Floating Start Itinerary FAB */}
+                  <TouchableOpacity
+                    style={styles.startFabButton}
+                    onPress={() => setShowFeedback(true)}
+                    activeOpacity={0.85}
+                  >
+                    <View style={styles.startFabInnerCircle}>
+                      <Ionicons name="navigate-sharp" size={14} color="#F26522" />
+                    </View>
+                    <Text style={styles.startFabText}>Démarrer l'itinéraire</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </ScrollView>
           </View>
         )}
 
-        {/* Content Section: Route Options or Step-by-Step Breakdown */}
-        <ScrollView
-          style={styles.scrollContainer}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-        >
-          {!showDetail ? (
-            /* Option Summary Card */
-            <View style={styles.summaryCard}>
-              <View style={styles.summaryHeader}>
-                <View>
-                  <Text style={styles.summaryTitle}>{selectedMode}</Text>
-                  <Text style={styles.summaryCost}>
-                    Coût : entre 500F et 1.500F
-                  </Text>
-                  <Text style={styles.summaryTimes}>
-                    Départ : 09H30 • Arrivée : 10H30
-                  </Text>
-                </View>
-                <View style={styles.durationBadge}>
-                  <Text style={styles.durationNumber}>24</Text>
-                  <Text style={styles.durationUnit}>min</Text>
-                </View>
-              </View>
-
-              <View style={styles.trafficRow}>
-                <View style={styles.trafficIndicator} />
-                <Text style={styles.trafficText}>
-                  Trafic modéré • sur 18 Km
-                </Text>
-              </View>
-
-              {/* Step preview pills */}
-              <View style={styles.stepPillsRow}>
-                <View style={styles.stepPill}>
-                  <Ionicons name="walk" size={13} color="#F26522" />
-                  <Text style={styles.stepPillText}>5 min</Text>
-                </View>
-                <Ionicons name="chevron-forward" size={12} color="#999999" />
-                <View style={styles.stepPill}>
-                  <Ionicons name="bus" size={13} color="#F26522" />
-                  <Text style={styles.stepPillText}>7 min</Text>
-                </View>
-                <Ionicons name="chevron-forward" size={12} color="#999999" />
-                <View style={styles.stepPill}>
-                  <Ionicons name="car" size={13} color="#F26522" />
-                  <Text style={styles.stepPillText}>9 min</Text>
-                </View>
-                <Ionicons name="chevron-forward" size={12} color="#999999" />
-                <View style={styles.stepPill}>
-                  <Ionicons name="walk" size={13} color="#F26522" />
-                  <Text style={styles.stepPillText}>3 min</Text>
-                </View>
-              </View>
-
-              <TouchableOpacity
-                style={styles.detailButton}
-                onPress={() => setShowDetail(true)}
-                activeOpacity={0.85}
-              >
-                <Text style={styles.detailButtonText}>Détail de l'itinéraire</Text>
-                <Ionicons name="arrow-forward" size={16} color="#FFFFFF" />
-              </TouchableOpacity>
-            </View>
-          ) : (
-            /* Itinerary Breakdown / Decomposition */
-            <View style={styles.detailCard}>
-              <View style={styles.detailCardHeader}>
-                <Text style={styles.detailCardTitle}>
-                  Décomposition d'itinéraire
-                </Text>
-                <TouchableOpacity
-                  onPress={() => setShowDetail(false)}
-                  style={styles.closeDetailBtn}
-                >
-                  <Ionicons name="close" size={18} color="#666666" />
-                </TouchableOpacity>
-              </View>
-
-              {/* Assistant guidance tip */}
-              <View style={styles.tipBox}>
-                <Image
-                  source={require('@/assets/images/sira-character-assistant.png')}
-                  style={styles.tipAvatar}
-                  contentFit="contain"
-                />
-                <Text style={styles.tipText}>
-                  Voici comment vous allez rejoindre votre destination sans stress !
-                </Text>
-              </View>
-
-              {/* Timeline Steps */}
-              {routeSteps.map((step, idx) => (
-                <View key={step.id} style={styles.timelineItem}>
-                  <View style={styles.timelineIconCol}>
-                    <View style={styles.timelineIconCircle}>
-                      <Ionicons name={step.icon} size={16} color="#F26522" />
-                    </View>
-                    {idx < routeSteps.length - 1 && (
-                      <View style={styles.timelineLine} />
-                    )}
-                  </View>
-
-                  <View style={styles.timelineContent}>
-                    <Text style={styles.stepTitle}>{step.title}</Text>
-                    <Text style={styles.stepDesc}>{step.description}</Text>
-                    <View style={styles.stepMetaRow}>
-                      <Text style={styles.stepTime}>{step.timeRange}</Text>
-                      <Text style={styles.stepDist}>{step.distanceOrCost}</Text>
-                    </View>
-                  </View>
-                </View>
-              ))}
-
-              {/* Start Navigation Action Button */}
-              <TouchableOpacity
-                style={styles.startNavButton}
-                onPress={() => setShowFeedback(true)}
-                activeOpacity={0.85}
-              >
-                <Text style={styles.startNavText}>Démarrer l'itinéraire</Text>
-                <Ionicons name="navigate" size={18} color="#FFFFFF" />
-              </TouchableOpacity>
-            </View>
-          )}
-        </ScrollView>
-
-        {/* Feedback / Trip rating popup modal */}
+        {/* Feedback Rating Popup Modal */}
         {showFeedback && (
           <View style={styles.feedbackModalOverlay}>
             <View style={styles.feedbackCard}>
@@ -328,13 +617,12 @@ export default function RouteExploreScreen() {
               />
 
               <Text style={styles.feedbackTitle}>
-                Comment s'est passé votre trajet Diata ?
+                Comment s'est passé votre trajet ?
               </Text>
               <Text style={styles.feedbackSub}>
                 Votre avis nous aide à améliorer SIRA.
               </Text>
 
-              {/* 5 Stars Rating */}
               <View style={styles.starsRow}>
                 {[1, 2, 3, 4, 5].map((star) => (
                   <TouchableOpacity
@@ -369,287 +657,438 @@ export default function RouteExploreScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F7',
-  },
-  mapBackground: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    width: '100%',
-    height: '100%',
-    opacity: 0.85,
+    backgroundColor: '#FAFAFA',
   },
   safeArea: {
     flex: 1,
   },
-  header: {
+  topHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 8,
-  },
-  backButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    paddingVertical: 6,
     backgroundColor: '#FFFFFF',
-    justifyContent: 'center',
+  },
+  logoRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    gap: 8,
   },
-  brandContainer: {
-    alignItems: 'center',
+  backBtnWrapper: {
+    padding: 4,
   },
-  headerLogo: {
-    width: 60,
-    height: 28,
+  logoImage: {
+    width: 120,
+    height: 42,
   },
-  headerSlogan: {
-    fontSize: 9,
-    fontWeight: '800',
-    color: '#333333',
-    marginTop: 2,
-  },
-  menuButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: '#FFFFFF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  routeCard: {
-    marginHorizontal: 16,
-    marginTop: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.96)',
-    borderRadius: 20,
-    padding: 14,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.12,
-    shadowRadius: 10,
-    elevation: 5,
-  },
-  routeRow: {
+  headerRightActions: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
   },
-  dotGreen: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: '#34A853',
+  headerIconButton: {
+    position: 'relative',
+    padding: 4,
   },
-  dotOrange: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
+  notificationBadge: {
+    position: 'absolute',
+    top: 0,
+    right: -2,
+    backgroundColor: '#F26522',
+    borderRadius: 8,
+    width: 16,
+    height: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  badgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  mainScrollView: {
+    flex: 1,
+  },
+  mainScrollContent: {
+    paddingBottom: 30,
+  },
+  routeInputCard: {
+    marginHorizontal: 16,
+    marginTop: 4,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  routeTimelineCol: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  deptRingDot: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    borderWidth: 2,
+    borderColor: '#F26522',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  deptInnerDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
     backgroundColor: '#F26522',
   },
-  routeTextCol: {
+  verticalDottedLine: {
+    width: 1,
+    height: 20,
+    borderWidth: 1,
+    borderColor: '#CCCCCC',
+    borderStyle: 'dashed',
+    marginVertical: 1,
+  },
+  routeInputsCol: {
     flex: 1,
   },
-  routeLabel: {
-    color: '#8E8E8E',
-    fontSize: 11,
-    fontWeight: '600',
+  inputItemRow: {
+    paddingVertical: 1,
   },
-  routeValue: {
-    color: '#111111',
-    fontSize: 14,
+  inputLabel: {
+    fontSize: 10.5,
+    color: '#888888',
+    fontWeight: '500',
+  },
+  inputValueInput: {
+    fontSize: 13,
+    color: '#000000',
     fontWeight: '800',
-    marginTop: 1,
+    marginTop: 0,
+    padding: 0,
   },
-  routeDivider: {
+  cardInputDivider: {
     height: 1,
-    backgroundColor: '#EAEAEA',
-    marginVertical: 8,
-    marginLeft: 22,
+    backgroundColor: '#EEEEEE',
+    marginVertical: 4,
   },
-  modeTabs: {
-    flexDirection: 'row',
-    gap: 8,
-    marginHorizontal: 16,
-    marginTop: 10,
+  swapButton: {
+    padding: 6,
+    marginLeft: 6,
+    backgroundColor: '#FFF4EE',
+    borderRadius: 16,
   },
-  modeTab: {
-    flex: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    borderRadius: 14,
-    paddingVertical: 8,
+  filtersScrollView: {
+    marginTop: 4,
+    maxHeight: 34,
+  },
+  filtersContentContainer: {
+    paddingHorizontal: 16,
+    gap: 6,
     alignItems: 'center',
+  },
+  filterChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#EFEFEF',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 16,
+    gap: 5,
+  },
+  filterChipActive: {
+    backgroundColor: '#F26522',
+  },
+  filterChipText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#333333',
+  },
+  filterChipTextActive: {
+    color: '#FFFFFF',
+  },
+  modeCardsRow: {
+    flexDirection: 'row',
+    gap: 6,
+    marginHorizontal: 16,
+    marginTop: 4,
+  },
+  modeCard: {
+    flex: 1,
+    backgroundColor: '#000000',
+    borderRadius: 10,
+    paddingVertical: 6,
+    paddingHorizontal: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 1.5,
     borderColor: 'transparent',
   },
-  modeTabActive: {
-    backgroundColor: '#FFFFFF',
+  modeCardActive: {
     borderColor: '#F26522',
-    shadowColor: '#F26522',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 6,
-    elevation: 4,
+    backgroundColor: '#141414',
   },
-  modeTabText: {
-    color: '#333333',
-    fontSize: 13,
-    fontWeight: '800',
-  },
-  modeTabTextActive: {
-    color: '#F26522',
-  },
-  modeTabSub: {
-    color: '#777777',
-    fontSize: 10,
-    fontWeight: '500',
+  modeCardTextWrapper: {
+    alignItems: 'center',
     marginTop: 1,
   },
-  modeTabSubActive: {
-    color: '#F26522',
+  vipBadgeText: {
+    fontSize: 7,
+    fontWeight: '900',
+    color: '#FFFFFF',
+    letterSpacing: 0.5,
   },
-  scrollContainer: {
-    flex: 1,
-    marginTop: 10,
+  modeCardTitle: {
+    fontSize: 11.5,
+    fontWeight: '800',
+    color: '#FFFFFF',
   },
-  scrollContent: {
-    paddingHorizontal: 16,
-    paddingBottom: 40,
+  modeCardSub: {
+    fontSize: 9,
+    color: '#CCCCCC',
+    marginTop: 1,
   },
-  summaryCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.97)',
-    borderRadius: 20,
-    padding: 16,
+  mapContainer: {
+    marginHorizontal: 16,
+    marginTop: 6,
+    height: 390,
+    borderRadius: 18,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#E2E2E2',
+    backgroundColor: '#FFFFFF',
     shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.12,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.08,
     shadowRadius: 8,
-    elevation: 5,
+    elevation: 3,
   },
-  summaryHeader: {
+  mapImage: {
+    width: '100%',
+    height: '100%',
+  },
+  sectionHeaderBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginHorizontal: 16,
+    marginTop: 14,
+    marginBottom: 2,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: '#F0F0F0',
+  },
+  sectionHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  sectionHeaderIconCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#F26522',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  sectionHeaderTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#1A1A1A',
+    letterSpacing: 0.2,
+  },
+  sectionHeaderBadge: {
+    backgroundColor: '#F26522',
+    borderRadius: 10,
+    paddingHorizontal: 9,
+    paddingVertical: 3,
+    minWidth: 24,
+    alignItems: 'center',
+  },
+  sectionHeaderBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '900',
+  },
+  resultsContainer: {
+    marginHorizontal: 16,
+    marginTop: 12,
+    gap: 8,
+  },
+  resultCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 10,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 5,
+    elevation: 2,
+    borderWidth: 1.5,
+    borderColor: '#EEEEEE',
+  },
+  resultCardHighlighted: {
+    borderColor: '#F26522',
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  resultCardTopRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
   },
-  summaryTitle: {
-    color: '#111111',
-    fontSize: 18,
+  resultModeTitle: {
+    fontSize: 15,
     fontWeight: '900',
+    color: '#000000',
   },
-  summaryCost: {
-    color: '#555555',
-    fontSize: 13,
-    fontWeight: '600',
-    marginTop: 4,
-  },
-  summaryTimes: {
-    color: '#777777',
-    fontSize: 11.5,
-    marginTop: 2,
-  },
-  durationBadge: {
-    backgroundColor: '#F26522',
-    borderRadius: 14,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    alignItems: 'center',
-  },
-  durationNumber: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '900',
-  },
-  durationUnit: {
-    color: '#FFFFFF',
-    fontSize: 10,
-    fontWeight: '700',
+  resultRightStats: {
+    alignItems: 'flex-end',
   },
   trafficRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    marginTop: 12,
-  },
-  trafficIndicator: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#34A853',
+    gap: 3,
   },
   trafficText: {
-    color: '#555555',
-    fontSize: 12,
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#000000',
+  },
+  distanceText: {
+    fontSize: 10,
+    color: '#666666',
+    marginTop: 1,
+  },
+  durationWrapper: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    marginTop: 1,
+  },
+  durationPrefix: {
+    fontSize: 11,
+    color: '#000000',
     fontWeight: '600',
   },
-  stepPillsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginVertical: 14,
+  durationBold: {
+    fontSize: 19,
+    fontWeight: '900',
+    color: '#000000',
   },
-  stepPill: {
+  durationUnit: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#000000',
+  },
+  stepsPillsRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#F8F9FA',
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#EAEAEA',
+    marginTop: 6,
+    flexWrap: 'wrap',
   },
-  stepPillText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#333333',
-  },
-  detailButton: {
-    backgroundColor: '#F26522',
+  stepTag: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 12,
-    borderRadius: 16,
-    marginTop: 6,
+    backgroundColor: '#F26522',
+    paddingHorizontal: 7,
+    paddingVertical: 2.5,
+    borderRadius: 10,
+    gap: 3,
   },
-  detailButtonText: {
+  stepTagText: {
     color: '#FFFFFF',
-    fontSize: 13.5,
+    fontSize: 10,
     fontWeight: '800',
   },
-  detailCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.98)',
-    borderRadius: 22,
-    padding: 18,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.15,
-    shadowRadius: 10,
-    elevation: 6,
+  stepSeparator: {
+    color: '#888888',
+    fontSize: 11,
+    fontWeight: '800',
   },
-  detailCardHeader: {
+  resultCardBottomRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+    marginTop: 8,
+    paddingTop: 6,
+    borderTopWidth: 1,
+    borderTopColor: '#F2F2F2',
+  },
+  priceTimeCol: {
+    flex: 1,
+  },
+  costText: {
+    fontSize: 10,
+    color: '#333333',
+  },
+  timesText: {
+    fontSize: 10,
+    color: '#333333',
+    marginTop: 1,
+  },
+  boldText: {
+    fontWeight: '800',
+    color: '#000000',
+  },
+  detailPillBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F26522',
+    paddingHorizontal: 10,
+    paddingVertical: 4.5,
+    borderRadius: 14,
+    gap: 3,
+    shadowColor: '#F26522',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  detailPillBtnText: {
+    color: '#FFFFFF',
+    fontSize: 10.5,
+    fontWeight: '800',
+  },
+  detailModalOverlay: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+    zIndex: 100,
+  },
+  detailModalCard: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 20,
+    maxHeight: '80%',
+  },
+  detailModalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 14,
   },
-  detailCardTitle: {
-    color: '#111111',
-    fontSize: 17,
+  detailModalTitle: {
+    fontSize: 16,
     fontWeight: '900',
+    color: '#000000',
   },
   closeDetailBtn: {
     padding: 4,
@@ -658,117 +1097,370 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#FFF4EE',
+    padding: 12,
     borderRadius: 14,
-    padding: 10,
-    gap: 10,
     marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#FFD9C6',
+    gap: 12,
   },
   tipAvatar: {
-    width: 38,
-    height: 38,
+    width: 40,
+    height: 40,
   },
   tipText: {
     flex: 1,
-    color: '#333333',
     fontSize: 12,
+    color: '#333333',
     fontWeight: '600',
+  },
+  timelineList: {
+    gap: 14,
+    marginBottom: 20,
   },
   timelineItem: {
     flexDirection: 'row',
-    gap: 12,
-    marginBottom: 14,
-  },
-  timelineIconCol: {
     alignItems: 'center',
-    width: 28,
+    gap: 12,
   },
-  timelineIconCircle: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#FFF4EE',
+  timelineInfo: {
+    flex: 1,
+  },
+  timelineTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#000000',
+  },
+  timelineSub: {
+    fontSize: 11,
+    color: '#666666',
+    marginTop: 1,
+  },
+  confirmNavBtn: {
+    backgroundColor: '#F26522',
+    flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: '#F26522',
+    paddingVertical: 14,
+    borderRadius: 24,
+    gap: 8,
   },
-  timelineLine: {
-    flex: 1,
-    width: 2,
-    backgroundColor: '#F26522',
-    marginVertical: 4,
-    opacity: 0.4,
-  },
-  timelineContent: {
-    flex: 1,
-  },
-  stepTitle: {
-    color: '#111111',
-    fontSize: 13.5,
+  confirmNavText: {
+    color: '#FFFFFF',
+    fontSize: 15,
     fontWeight: '800',
   },
-  stepDesc: {
-    color: '#555555',
-    fontSize: 12,
-    marginTop: 2,
-    lineHeight: 16,
+  fullDecompositionContainer: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#FFFFFF',
+    zIndex: 150,
   },
-  stepMetaRow: {
+  decompHeaderBar: {
     flexDirection: 'row',
-    gap: 10,
-    marginTop: 4,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
   },
-  stepTime: {
+  decompHeaderTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#000000',
+  },
+  decompHeaderRightIcons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  decompMapSection: {
+    height: height * 0.38,
+    width: '100%',
+    position: 'relative',
+    overflow: 'hidden',
+    backgroundColor: '#EAEAEA',
+  },
+  decompMapImage: {
+    width: '100%',
+    height: '100%',
+  },
+  mapLegendCard: {
+    position: 'absolute',
+    top: 12,
+    right: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.94)',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    gap: 6,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  legendRowItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  legendLineBar: {
+    width: 24,
+    height: 4,
+    borderRadius: 2,
+  },
+  mapTrafficCallout: {
+    position: 'absolute',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderWidth: 1,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  accidentCallout: {
+    top: '32%',
+    right: '15%',
+    borderColor: '#E53E3E',
+  },
+  accidentTitle: {
+    fontSize: 10.5,
+    fontWeight: '800',
+    color: '#E53E3E',
+  },
+  accidentSub: {
+    fontSize: 9.5,
+    color: '#E53E3E',
+  },
+  routePerturbeeCallout: {
+    top: '60%',
+    left: '40%',
+    borderColor: '#F26522',
+  },
+  routePerturbeeText: {
+    fontSize: 10.5,
+    fontWeight: '800',
     color: '#F26522',
-    fontSize: 11,
+  },
+  departStationBadge: {
+    position: 'absolute',
+    top: 14,
+    left: 14,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  departTag: {
+    backgroundColor: '#00875A',
+    color: '#FFFFFF',
+    fontSize: 8.5,
+    fontWeight: '900',
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 4,
+    alignSelf: 'flex-start',
+  },
+  departName: {
+    fontSize: 11.5,
+    fontWeight: '800',
+    color: '#000000',
+    marginTop: 2,
+  },
+  mapCompassFab: {
+    position: 'absolute',
+    bottom: 14,
+    right: 14,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#F26522',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#F26522',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  decompScrollView: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
+  decompScrollContent: {
+    paddingTop: 16,
+    paddingHorizontal: 16,
+    paddingBottom: 40,
+  },
+  decompTimelineRowLayout: {
+    flexDirection: 'row',
+    position: 'relative',
+  },
+  timelineDashedLine: {
+    position: 'absolute',
+    left: 18,
+    top: 10,
+    bottom: 40,
+    width: 6,
+    backgroundColor: '#000000',
+    borderRadius: 3,
+  },
+  timelineStepsCol: {
+    flex: 1.2,
+    paddingLeft: 0,
+    gap: 20,
+  },
+  stepItemRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  stepCircleIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#F26522',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 2,
+    shadowColor: '#F26522',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  stepInfoCol: {
+    flex: 1,
+    paddingTop: 2,
+  },
+  stepTitleText: {
+    fontSize: 14.5,
+    fontWeight: '800',
+    color: '#000000',
+  },
+  stepDescText: {
+    fontSize: 12.5,
+    color: '#444444',
+    marginTop: 2,
+    lineHeight: 17,
+  },
+  stepCostText: {
+    fontSize: 12,
     fontWeight: '700',
+    color: '#333333',
+    marginTop: 3,
   },
-  stepDist: {
+  stepMetaText: {
+    fontSize: 11.5,
     color: '#777777',
-    fontSize: 11,
     fontWeight: '600',
+    marginTop: 3,
   },
-  startNavButton: {
+  destTitleText: {
+    fontSize: 16,
+    fontWeight: '900',
+    color: '#F26522',
+  },
+  destActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    marginTop: 8,
+  },
+  actionIconBtn: {
+    padding: 4,
+  },
+  assistantColumn: {
+    width: 140,
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    position: 'relative',
+    paddingLeft: 6,
+  },
+  floatingBubbleBox: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: '#EAEAEA',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 4,
+    marginBottom: 8,
+  },
+  bubbleText: {
+    fontSize: 11,
+    color: '#333333',
+    lineHeight: 15,
+  },
+  bubbleBoldText: {
+    fontWeight: '900',
+    color: '#000000',
+  },
+  pointingCharacterImg: {
+    width: 130,
+    height: 190,
+    marginBottom: 12,
+  },
+  startFabButton: {
     backgroundColor: '#F26522',
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 13,
-    borderRadius: 16,
-    marginTop: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 22,
+    gap: 6,
+    shadowColor: '#F26522',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    elevation: 6,
   },
-  startNavText: {
+  startFabInnerCircle: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  startFabText: {
     color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '900',
+    fontSize: 12,
+    fontWeight: '800',
   },
   feedbackModalOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    ...StyleSheet.absoluteFill,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    zIndex: 100,
+    padding: 20,
+    zIndex: 200,
   },
   feedbackCard: {
-    width: '100%',
+    width: '90%',
     backgroundColor: '#FFFFFF',
     borderRadius: 24,
-    padding: 22,
+    padding: 20,
     alignItems: 'center',
     position: 'relative',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.25,
-    shadowRadius: 16,
-    elevation: 10,
   },
   feedbackClose: {
     position: 'absolute',
@@ -777,39 +1469,37 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   feedbackAvatar: {
-    width: 90,
-    height: 90,
+    width: 70,
+    height: 70,
     marginBottom: 10,
   },
   feedbackTitle: {
-    color: '#111111',
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: '900',
+    color: '#000000',
     textAlign: 'center',
-    marginBottom: 6,
   },
   feedbackSub: {
+    fontSize: 12,
     color: '#666666',
-    fontSize: 12.5,
+    marginTop: 4,
     textAlign: 'center',
-    marginBottom: 16,
   },
   starsRow: {
     flexDirection: 'row',
     gap: 8,
-    marginBottom: 20,
+    marginVertical: 16,
   },
   submitFeedbackBtn: {
     backgroundColor: '#F26522',
-    paddingHorizontal: 28,
+    width: '100%',
     paddingVertical: 12,
     borderRadius: 20,
-    width: '100%',
     alignItems: 'center',
   },
   submitFeedbackText: {
     color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: '900',
+    fontSize: 14,
+    fontWeight: '800',
   },
 });

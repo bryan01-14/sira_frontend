@@ -86,18 +86,14 @@ export default function SignupScreen() {
                 contentFit="contain"
               />
 
- devin/1788621120-onboarding-hero-layout
-          {/* Bottom Card / White Background Section */}
-          <View style={styles.bottomSection}>
-            <View style={styles.titleContainer}>
-              <Text style={styles.welcomeTitle}>
-                BIENVENUE SUR <Text style={styles.orangeText}>SIRA</Text>
-              </Text>
-              <Text style={styles.welcomeSubtitle}>
-                L&apos;application qui simplifie{
-}vos déplacements à Abidjan.
-              </Text>
-
+              {/* Front-facing iPhone Mockup on the left side of the wave */}
+              <View style={styles.mockupContainer}>
+                <Image
+                  source={require('@/assets/images/sira-phone-vertical-straight.png')}
+                  style={styles.mockupImage}
+                  contentFit="contain"
+                />
+              </View>
             </View>
 
             {/* Bottom Form Section */}
@@ -140,15 +136,14 @@ export default function SignupScreen() {
                 />
               </View>
 
-              devin/1788621120-onboarding-hero-layout
-            {/* Orange Inscription Button */}
-            <TouchableOpacity
-              style={styles.signupButton}
-              onPress={handleSignup}
-              activeOpacity={0.85}
-            >
-              <Text style={styles.signupButtonText}>S&apos;INSCRIRE</Text>
-            </TouchableOpacity>
+              {/* Orange Inscription Button */}
+              <TouchableOpacity
+                style={styles.signupButton}
+                onPress={handleSignup}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.signupButtonText}>S'INSCRIRE</Text>
+              </TouchableOpacity>
 
               {/* Switch to Login Link */}
               <TouchableOpacity

@@ -49,6 +49,14 @@ export default function RootLayout() {
         />
 
         <Stack.Screen
+          name="route-detail"
+          options={{
+            headerShown: false,
+            animation: 'slide_from_right',
+          }}
+        />
+
+        <Stack.Screen
           name="modal"
           options={{
             presentation: 'modal',

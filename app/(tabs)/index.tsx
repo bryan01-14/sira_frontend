@@ -23,8 +23,23 @@ export default function HomeScreen() {
   const [destination, setDestination] = useState('');
 
   const handleSearchPress = () => {
-    // Navigate to route planning screen
-    router.push('/(tabs)/explore');
+    const target = destination.trim();
+    if (target) {
+      router.push({
+        pathname: '/(tabs)/explore',
+        params: { destination: target, query: target },
+      });
+    } else {
+      router.push('/(tabs)/explore');
+    }
+  };
+
+  const handleQuickSelect = (place: string) => {
+    setDestination(place);
+    router.push({
+      pathname: '/(tabs)/explore',
+      params: { destination: place, query: place },
+    });
   };
 
   return (
@@ -59,7 +74,7 @@ export default function HomeScreen() {
             <Text style={styles.speechSub}>assistant de mobilité.</Text>
           </View>
 
-          {/* 3D Animated Assistant Character (Diata / Sira mascot waving) */}
+          {/* 3D Animated Assistant Character */}
           <View style={styles.characterContainer}>
             <Image
               source={require('@/assets/images/sira-character-assistant.png')}
@@ -69,32 +84,102 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* Bottom Destination Search Bar (Floating Orange Pill) */}
+        {/* Bottom Destination Section */}
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.bottomBarContainer}
         >
-          <TouchableOpacity
-            style={styles.searchPill}
-            onPress={handleSearchPress}
-            activeOpacity={0.9}
-          >
-            {/* Left Orange Circle with Location Pin */}
+          {/* Destination Search Bar (Floating Orange Pill with TextInput) */}
+          <View style={styles.searchPill}>
             <View style={styles.searchPinCircle}>
               <Ionicons name="location-sharp" size={18} color="#FFFFFF" />
             </View>
 
-            {/* Input / Placeholder Text */}
             <View style={styles.searchInputWrapper}>
-              <Text style={styles.searchTitle}>Où voulez-vous aller ?</Text>
-              <Text style={styles.searchSubtitle}>Entrez votre destination</Text>
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Où voulez-vous aller ?"
+                placeholderTextColor="rgba(255, 255, 255, 0.75)"
+                value={destination}
+                onChangeText={setDestination}
+                onSubmitEditing={handleSearchPress}
+                returnKeyType="search"
+                autoCapitalize="sentences"
+                autoCorrect={false}
+              />
             </View>
 
-            {/* Right Arrow / Action Icon */}
-            <View style={styles.searchArrowCircle}>
+            {destination.length > 0 && (
+              <TouchableOpacity
+                style={styles.clearCircle}
+                onPress={() => setDestination('')}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="close" size={16} color="#FFFFFF" />
+              </TouchableOpacity>
+            )}
+
+            <TouchableOpacity
+              style={styles.searchArrowCircle}
+              onPress={handleSearchPress}
+              activeOpacity={0.7}
+            >
               <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
-            </View>
-          </TouchableOpacity>
+            </TouchableOpacity>
+          </View>
+
+          {/* Quick Favorite Place Chips */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.quickFavsScrollView}
+            contentContainerStyle={styles.quickFavsContainer}
+          >
+            <TouchableOpacity
+              style={styles.quickFavChip}
+              onPress={() => handleQuickSelect('Abobo Samaké')}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="home" size={13} color="#F26522" />
+              <Text style={styles.quickFavText}>Maison</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.quickFavChip}
+              onPress={() => handleQuickSelect('Orange Digital Center')}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="briefcase" size={13} color="#F26522" />
+              <Text style={styles.quickFavText}>Travail</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.quickFavChip}
+              onPress={() => handleQuickSelect("Gare d'Adjamé")}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="bus" size={13} color="#F26522" />
+              <Text style={styles.quickFavText}>Gare Adjamé</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.quickFavChip}
+              onPress={() => handleQuickSelect('Plateau Immeuble CCIA')}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="location" size={13} color="#F26522" />
+              <Text style={styles.quickFavText}>Plateau</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.quickFavChip}
+              onPress={() => handleQuickSelect('Riviera 3')}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="navigate" size={13} color="#F26522" />
+              <Text style={styles.quickFavText}>Riviera 3</Text>
+            </TouchableOpacity>
+          </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
     </View>
@@ -154,11 +239,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'flex-end',
     position: 'relative',
-    paddingBottom: 20,
+    paddingBottom: 0,
   },
   speechBubble: {
     position: 'absolute',
-    top: height * 0.08,
+    top: height * 0.05,
     left: 24,
     backgroundColor: 'rgba(255, 255, 255, 0.95)',
     paddingHorizontal: 18,
@@ -194,9 +279,11 @@ const styles = StyleSheet.create({
     fontWeight: '400',
   },
   characterContainer: {
-    width: width * 0.88,
-    height: height * 0.52,
-    alignItems: 'center',
+    width: width * 0.86,
+    height: height * 0.36,
+    alignSelf: 'flex-start',
+    marginLeft: -10,
+    marginBottom: 10,
     justifyContent: 'flex-end',
   },
   characterImage: {
@@ -205,16 +292,47 @@ const styles = StyleSheet.create({
   },
   bottomBarContainer: {
     paddingHorizontal: 20,
-    paddingBottom: Platform.OS === 'ios' ? 24 : 32,
+    paddingBottom: Platform.OS === 'ios' ? 115 : 95,
     width: '100%',
+  },
+  quickFavsScrollView: {
+    marginTop: 0,
+    maxHeight: 52,
+  },
+  quickFavsContainer: {
+    gap: 10,
+    alignItems: 'center',
+    paddingVertical: 2,
+  },
+  quickFavChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 22,
+    gap: 8,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.14,
+    shadowRadius: 6,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(242, 101, 34, 0.15)',
+  },
+  quickFavText: {
+    fontSize: 13.5,
+    fontWeight: '700',
+    color: '#1F2937',
   },
   searchPill: {
     backgroundColor: '#F26522',
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
     borderRadius: 30,
+    marginBottom: 12,
     shadowColor: '#F26522',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.38,
@@ -231,18 +349,23 @@ const styles = StyleSheet.create({
   },
   searchInputWrapper: {
     flex: 1,
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
+    justifyContent: 'center',
   },
-  searchTitle: {
+  searchInput: {
     color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '800',
+    fontSize: 15,
+    fontWeight: '700',
+    paddingVertical: Platform.OS === 'ios' ? 8 : 4,
   },
-  searchSubtitle: {
-    color: 'rgba(255, 255, 255, 0.8)',
-    fontSize: 11.5,
-    fontWeight: '400',
-    marginTop: 1,
+  clearCircle: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 6,
   },
   searchArrowCircle: {
     width: 34,

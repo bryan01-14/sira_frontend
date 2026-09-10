@@ -16,24 +16,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 const { width, height } = Dimensions.get('window');
 
-/* Geometry measured on the designer mockup (slide canvas 123 x 265) */
-const CARD_TOP = height * 0.721;
-
-const PHONE_WIDTH = width * 0.5675;
-const PHONE_HEIGHT = (PHONE_WIDTH * 1024) / 501;
-const PHONE_TOP = height * 0.208;
-const PHONE_RIGHT = -PHONE_WIDTH * 0.34;
-const PHONE_ROTATION = '10.4deg';
-
 interface OnboardingSlide {
   id: string;
   title: string;
   description: string;
-  /* Brand word rendered in orange right before the description */
-  descriptionPrefix?: string;
   heroBgImage: any;
-  /* Horizontal framing of the photo, as in the mockup */
-  heroBgPosition: string;
   phoneMockupImage?: any;
 }
 
@@ -42,43 +29,32 @@ const SLIDES: OnboardingSlide[] = [
     id: '1',
     title: 'LA PREMIÈRE PLATEFORME\nDE MOBILITÉ INTELLIGENTE',
     description: 'pensée pour simplifier vos déplacements\nà abidjan.',
-devin/1788621120-onboarding-hero-layout
-    heroBgImage: require('@/assets/images/bridge-bg.png'),
-    heroBgPosition: '58%',
-    phoneMockupImage: require('@/assets/images/sira-app-mockup.png'),
+    heroBgImage: require('@/assets/images/bridge-bg.jpg'),
+    phoneMockupImage: require('@/assets/images/sira-phone-official-mockup.png'),
   },
   {
     id: '2',
     title: "TROUVEZ L'ITINÉRAIRE\nQUI VOUS CONVIENT",
-    descriptionPrefix: 'Sira',
-    description:
-      ' analyse les conditions de circulation\npour vous proposer des itinéraires\nadaptés à votre situation.',
+    description: 'Sira analyse les conditions de circulation\npour vous proposer des itinéraires\nadaptés à votre situation.',
     heroBgImage: require('@/assets/images/slide2-bg.jpg'),
-    heroBgPosition: '50%',
   },
   {
     id: '3',
     title: 'CHOISISSEZ VOTRE FAÇON\nDE VOUS DÉPLACER',
-    description:
-      'comparez les différentes options de transport\ndisponibles pour choisir celle qui correspond\nle mieux à votre trajet.',
+    description: 'comparez les différentes options de transport\ndisponibles pour choisir celle qui correspond\nle mieux à votre trajet.',
     heroBgImage: require('@/assets/images/slide3-bg.jpg'),
-    heroBgPosition: '50%',
   },
   {
     id: '4',
     title: 'ANTICIPEZ VOTRE TRAJET',
-    description:
-      'estimez le temps et le coût de\nvotre déplacement avant de prendre la route.',
+    description: 'estimez le temps et le coût de\nvotre déplacement avant de prendre la route.',
     heroBgImage: require('@/assets/images/slide4-bg.jpg'),
-    heroBgPosition: '66%',
   },
   {
     id: '5',
     title: 'RESTEZ INFORMÉ\nEN TEMPS RÉEL',
-    description:
-      'recevez des informations sur les perturbations,\nles incidents et les conditions de circulation\nsur votre trajet.',
+    description: 'recevez des informations sur les perturbations,\nles incidents et les conditions de circulation\nsur votre trajet.',
     heroBgImage: require('@/assets/images/slide5-bg.jpg'),
-    heroBgPosition: '50%',
   },
 ];
 
@@ -121,28 +97,23 @@ export default function OnboardingScreen() {
     router.push('/login');
   };
 
-  const renderSlide = ({ item, index }: { item: OnboardingSlide; index: number }) => {
+  const renderSlide = ({ item }: { item: OnboardingSlide }) => {
     return (
       <View style={styles.slide}>
-
         {/* Layer 1: Background Image with visible bridge tower on the left */}
- main
         <Image
           source={item.heroBgImage}
           style={styles.heroBgImage}
           contentFit="cover"
- devin/1788621120-onboarding-hero-layout
-          contentPosition={{ left: item.heroBgPosition }}
-          transition={0}
-
- main
+          contentPosition={item.phoneMockupImage ? { top: '0%', left: '72%' } : 'center'}
         />
+        <View style={styles.heroOverlayGradient} />
 
-        {/* Layer 2: Dark scrim covering the bottom third, the photo stays visible through it */}
-        <View style={styles.bottomScrim} />
+        {/* Layer 2: Black bottom card backdrop */}
+        <View style={styles.slideBottomBackdrop} />
 
-        {/* Layer 3: iPhone mockup, tilted and cropped by the right edge, overlapping the scrim */}
-        {item.phoneMockupImage ? (
+        {/* Layer 3: Phone Mockup on Slide 1 - Rendered in FRONT of the black background */}
+        {item.phoneMockupImage && (
           <View style={styles.phoneMockupContainer}>
             <Image
               source={item.phoneMockupImage}
@@ -150,52 +121,7 @@ export default function OnboardingScreen() {
               contentFit="contain"
             />
           </View>
-        ) : null}
-
-        {/* Layer 4: Slide copy */}
-        <View style={styles.cardContent}>
-          {/* Progress: the orange bar sits at the active slide position */}
-          <View style={styles.progressRow}>
-            {SLIDES.map((_, dotIndex) => (
-              <View
-                key={dotIndex}
-                style={[
-                  styles.progressPill,
-                  dotIndex === index ? styles.progressPillActive : styles.progressPillInactive,
-                ]}
-              />
-            ))}
-          </View>
-
-          <Text style={styles.titleText}>{item.title}</Text>
-          <Text style={styles.descriptionText}>
-            {item.descriptionPrefix ? (
-              <Text style={styles.descriptionBrand}>{item.descriptionPrefix}</Text>
-            ) : null}
-            {item.description}
-          </Text>
-
-          <View style={styles.actionsRow}>
-            <TouchableOpacity
-              style={styles.registerButton}
-              onPress={handleGoToSignup}
-              activeOpacity={0.85}
-            >
-              <Text style={styles.registerButtonText}>S&apos;INSCRIRE</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.loginButton}
-              onPress={handleGoToLogin}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.loginPrefixText} numberOfLines={1}>
-                J&apos;ai déjà un compte.{' '}
-                <Text style={styles.loginOrangeText}>SE CONNECTER</Text>
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+        )}
       </View>
     );
   };
@@ -204,6 +130,18 @@ export default function OnboardingScreen() {
     <View style={styles.container}>
       <StatusBar style="light" />
 
+      {/* Layer 4: Top Left Circular Back Arrow Button (←) */}
+      <SafeAreaView style={styles.topBar}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={handleBack}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.backArrowText}>←</Text>
+        </TouchableOpacity>
+      </SafeAreaView>
+
+      {/* Horizontal Slide Carousel */}
       <FlatList
         ref={flatListRef}
         data={SLIDES}
@@ -218,12 +156,56 @@ export default function OnboardingScreen() {
         style={styles.flatList}
       />
 
-      {/* Circular back arrow floating above the carousel */}
-      <SafeAreaView style={styles.topBar} pointerEvents="box-none">
-        <TouchableOpacity style={styles.backButton} onPress={handleBack} activeOpacity={0.8}>
-          <Text style={styles.backArrowText}>←</Text>
-        </TouchableOpacity>
-      </SafeAreaView>
+      {/* Layer 5: Bottom Sheet UI Content */}
+      <View style={styles.bottomCardContent} pointerEvents="box-none">
+        {/* Progress Bar (Orange Bar + 4 White Dots) */}
+        <View style={styles.progressRow}>
+          {SLIDES.map((_, index) => {
+            const isActive = index === currentIndex;
+            return (
+              <View
+                key={index}
+                style={[
+                  styles.progressPill,
+                  isActive ? styles.progressPillActive : styles.progressPillInactive,
+                ]}
+              />
+            );
+          })}
+        </View>
+
+        {/* Headline Title */}
+        <Text style={styles.titleText}>
+          {SLIDES[currentIndex].title}
+        </Text>
+
+        {/* Subtitle Description */}
+        <Text style={styles.descriptionText}>
+          {SLIDES[currentIndex].description}
+        </Text>
+
+        {/* Actions Row: S'INSCRIRE & J'ai déjà un compte. SE CONNECTER */}
+        <View style={styles.actionsRow}>
+          <TouchableOpacity
+            style={styles.registerButton}
+            onPress={handleGoToSignup}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.registerButtonText}>S'INSCRIRE</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.loginButton}
+            onPress={handleGoToLogin}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.loginPrefixText} numberOfLines={1}>
+              J'ai déjà un compte.{' '}
+              <Text style={styles.loginOrangeText}>SE CONNECTER</Text>
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
     </View>
   );
 }
@@ -254,55 +236,48 @@ const styles = StyleSheet.create({
   },
   flatList: {
     flex: 1,
+    zIndex: 10,
   },
   slide: {
     width: width,
     height: height,
     position: 'relative',
-    backgroundColor: '#000000',
+    overflow: 'hidden',
   },
 
-  /* Layer 1: full bleed photo */
+  /* Layer 1: Background Image */
   heroBgImage: {
-
     width: '100%',
     height: height * 0.70,
   },
   heroOverlayGradient: {
-main
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
-
     height: height * 0.70,
     backgroundColor: 'rgba(0, 0, 0, 0.02)',
- main
   },
 
-  /* Layer 2: bottom scrim */
-  bottomScrim: {
+  /* Layer 2: Slide Bottom Black Backdrop */
+  slideBottomBackdrop: {
     position: 'absolute',
-    top: CARD_TOP,
+    bottom: 0,
     left: 0,
     right: 0,
-
     height: height * 0.34,
     backgroundColor: '#000000',
     zIndex: 5,
- main
   },
 
-  /* Layer 3: tilted iPhone mockup */
+  /* Layer 3: Phone Mockup in FRONT of black backdrop */
   phoneMockupContainer: {
     position: 'absolute',
-
     right: -width * 0.16,
     top: height * 0.05,
     width: width * 0.85,
     height: height * 0.74,
     zIndex: 15,
- main
     shadowColor: '#000000',
     shadowOffset: { width: -8, height: 14 },
     shadowOpacity: 0.35,
@@ -314,17 +289,19 @@ main
     height: '100%',
   },
 
-  /* Layer 4: slide copy */
-  cardContent: {
+  /* Layer 4: Bottom Sheet UI Content */
+  bottomCardContent: {
     position: 'absolute',
-    top: CARD_TOP,
+    bottom: 0,
     left: 0,
     right: 0,
-    bottom: 0,
     paddingHorizontal: 20,
-    paddingTop: 22,
+    paddingTop: 18,
+    paddingBottom: 38,
+    zIndex: 30,
   },
 
+  /* Indicators: Long Orange Pill + Round White Dots */
   progressRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -345,6 +322,7 @@ main
     opacity: 0.95,
   },
 
+  /* Title: Heavy Uppercase Font */
   titleText: {
     color: '#FFFFFF',
     fontSize: 21,
@@ -354,17 +332,17 @@ main
     marginBottom: 8,
     textTransform: 'uppercase',
   },
+
+  /* Subtitle */
   descriptionText: {
     color: '#C5C5C5',
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '400',
-    lineHeight: 19,
-    marginBottom: 18,
+    lineHeight: 20,
+    marginBottom: 22,
   },
-  descriptionBrand: {
-    color: '#F5701E',
-    fontWeight: '700',
-  },
+
+  /* Actions Row */
   actionsRow: {
     flexDirection: 'row',
     alignItems: 'center',

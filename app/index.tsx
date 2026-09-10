@@ -75,7 +75,7 @@ export default function SplashScreen() {
       <View style={styles.logoContainer}>
         <Animated.View style={animatedLogoStyle}>
           <Image
-            source={require('@/assets/images/sira-logo-transparent.png')}
+            source={require('@/assets/images/sira-logo-official.png')}
             style={styles.logoImage}
             contentFit="contain"
           />
