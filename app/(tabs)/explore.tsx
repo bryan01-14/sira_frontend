@@ -409,14 +409,6 @@ export default function RouteExploreScreen() {
     <View style={styles.container}>
       <StatusBar style="dark" />
 
-      {/* Real OpenStreetMap Interactive Canvas with OSRM Polyline */}
-      <OsmMapView
-        departureName={departure}
-        arrivalName={arrival}
-        routeCoordinates={osrmCoords}
-        style={styles.backgroundImage}
-      />
-
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         {/* Top Header Bar */}
         <View style={styles.topHeader}>

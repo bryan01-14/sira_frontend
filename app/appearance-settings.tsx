@@ -13,12 +13,14 @@ import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
+import { useTheme } from '@/context/theme-context';
+
 type ModalType = 'theme' | 'textSize' | 'mapStyle' | null;
 
 export default function AppearanceSettingsScreen() {
   const router = useRouter();
+  const { themeMode, setThemeMode, isDark } = useTheme();
 
-  const [themeSetting, setThemeSetting] = useState('Thème par défaut du systhème');
   const [textSizeSetting, setTextSizeSetting] = useState('Standard');
   const [mapStyleSetting, setMapStyleSetting] = useState('Standard');
 
@@ -42,9 +44,22 @@ export default function AppearanceSettingsScreen() {
     'Relief',
   ];
 
+  const getThemeSettingLabel = () => {
+    if (themeMode === 'system') return 'Thème par défaut du systhème';
+    if (themeMode === 'light') return 'Clair';
+    if (themeMode === 'dark') return 'Sombre';
+    return 'Thème par défaut du systhème';
+  };
+
   const handleSelectOption = (value: string) => {
     if (activeModal === 'theme') {
-      setThemeSetting(value);
+      if (value === 'Clair') {
+        setThemeMode('light');
+      } else if (value === 'Sombre') {
+        setThemeMode('dark');
+      } else {
+        setThemeMode('system');
+      }
     } else if (activeModal === 'textSize') {
       setTextSizeSetting(value);
     } else if (activeModal === 'mapStyle') {
@@ -68,15 +83,15 @@ export default function AppearanceSettingsScreen() {
   };
 
   const getSelectedValue = () => {
-    if (activeModal === 'theme') return themeSetting;
+    if (activeModal === 'theme') return getThemeSettingLabel();
     if (activeModal === 'textSize') return textSizeSetting;
     if (activeModal === 'mapStyle') return mapStyleSetting;
     return '';
   };
 
   return (
-    <View style={styles.container}>
-      <StatusBar style="dark" />
+    <View style={[styles.container, isDark && { backgroundColor: '#121212' }]}>
+      <StatusBar style={isDark ? 'light' : 'dark'} />
 
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         {/* Top Header Bar */}
@@ -90,7 +105,7 @@ export default function AppearanceSettingsScreen() {
             <Ionicons name="arrow-back" size={20} color="#FFFFFF" />
           </TouchableOpacity>
 
-          <Text style={styles.headerTitle}>Apparence</Text>
+          <Text style={[styles.headerTitle, isDark && { color: '#FFFFFF' }]}>Apparence</Text>
           <View style={styles.headerRightSpacer} />
         </View>
 
@@ -102,13 +117,13 @@ export default function AppearanceSettingsScreen() {
         >
           {/* Card 1: Thème de l'application */}
           <TouchableOpacity
-            style={styles.settingCard}
+            style={[styles.settingCard, isDark && { backgroundColor: '#1E1E1E', borderColor: '#333333' }]}
             onPress={() => setActiveModal('theme')}
             activeOpacity={0.8}
           >
             <View style={styles.cardTextCol}>
-              <Text style={styles.cardTitle}>Thème de l'application</Text>
-              <Text style={styles.cardSubtitle}>{themeSetting}</Text>
+              <Text style={[styles.cardTitle, isDark && { color: '#FFFFFF' }]}>Thème de l'application</Text>
+              <Text style={[styles.cardSubtitle, isDark && { color: '#AAAAAA' }]}>{getThemeSettingLabel()}</Text>
             </View>
 
             <View style={styles.orangeChevronCircle}>
@@ -118,13 +133,13 @@ export default function AppearanceSettingsScreen() {
 
           {/* Card 2: Taille du texte */}
           <TouchableOpacity
-            style={styles.settingCard}
+            style={[styles.settingCard, isDark && { backgroundColor: '#1E1E1E', borderColor: '#333333' }]}
             onPress={() => setActiveModal('textSize')}
             activeOpacity={0.8}
           >
             <View style={styles.cardTextCol}>
-              <Text style={styles.cardTitle}>Taille du texte</Text>
-              <Text style={styles.cardSubtitle}>{textSizeSetting}</Text>
+              <Text style={[styles.cardTitle, isDark && { color: '#FFFFFF' }]}>Taille du texte</Text>
+              <Text style={[styles.cardSubtitle, isDark && { color: '#AAAAAA' }]}>{textSizeSetting}</Text>
             </View>
 
             <View style={styles.orangeChevronCircle}>
@@ -134,13 +149,13 @@ export default function AppearanceSettingsScreen() {
 
           {/* Card 3: Affichage de la carte */}
           <TouchableOpacity
-            style={styles.settingCard}
+            style={[styles.settingCard, isDark && { backgroundColor: '#1E1E1E', borderColor: '#333333' }]}
             onPress={() => setActiveModal('mapStyle')}
             activeOpacity={0.8}
           >
             <View style={styles.cardTextCol}>
-              <Text style={styles.cardTitle}>Affichage de la carte</Text>
-              <Text style={styles.cardSubtitle}>{mapStyleSetting}</Text>
+              <Text style={[styles.cardTitle, isDark && { color: '#FFFFFF' }]}>Affichage de la carte</Text>
+              <Text style={[styles.cardSubtitle, isDark && { color: '#AAAAAA' }]}>{mapStyleSetting}</Text>
             </View>
 
             <View style={styles.orangeChevronCircle}>

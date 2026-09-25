@@ -173,6 +173,71 @@ export function LocationSuggestionsList({
         </View>
       </View>
 
+      {/* Yango-Style Quick Shortcuts Chips (Lieux Fréquents & Raccourcis) */}
+      <View style={styles.shortcutsHeaderSection}>
+        <Text style={styles.shortcutsTitle}>Raccourcis & Lieux fréquents</Text>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.shortcutsScrollContainer}
+        >
+          <TouchableOpacity
+            style={styles.shortcutChip}
+            onPress={() => onSelectLocation('Abobo Samaké')}
+            activeOpacity={0.8}
+          >
+            <View style={[styles.shortcutIconCircle, { backgroundColor: '#F26522' }]}>
+              <Ionicons name="home" size={13} color="#FFFFFF" />
+            </View>
+            <Text style={styles.shortcutChipText}>Maison</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.shortcutChip}
+            onPress={() => onSelectLocation('Orange Digital Center')}
+            activeOpacity={0.8}
+          >
+            <View style={[styles.shortcutIconCircle, { backgroundColor: '#1E6091' }]}>
+              <Ionicons name="briefcase" size={13} color="#FFFFFF" />
+            </View>
+            <Text style={styles.shortcutChipText}>Travail</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.shortcutChip}
+            onPress={() => onSelectLocation('Adjamé Gare Routière')}
+            activeOpacity={0.8}
+          >
+            <View style={[styles.shortcutIconCircle, { backgroundColor: '#10B981' }]}>
+              <Ionicons name="bus" size={13} color="#FFFFFF" />
+            </View>
+            <Text style={styles.shortcutChipText}>Gare Adjamé</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.shortcutChip}
+            onPress={() => onSelectLocation('Cocody Saint-Jean')}
+            activeOpacity={0.8}
+          >
+            <View style={[styles.shortcutIconCircle, { backgroundColor: '#8B5CF6' }]}>
+              <Ionicons name="school" size={13} color="#FFFFFF" />
+            </View>
+            <Text style={styles.shortcutChipText}>Cocody St-Jean</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.shortcutChip}
+            onPress={() => onSelectLocation('Yopougon Sipores')}
+            activeOpacity={0.8}
+          >
+            <View style={[styles.shortcutIconCircle, { backgroundColor: '#EC4899' }]}>
+              <Ionicons name="navigate" size={13} color="#FFFFFF" />
+            </View>
+            <Text style={styles.shortcutChipText}>Yopougon Sipores</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </View>
+
       {/* Suggestions Items List */}
       <ScrollView
         keyboardShouldPersistTaps="handled"
@@ -203,35 +268,36 @@ export function LocationSuggestionsList({
           </TouchableOpacity>
         )}
 
-        {/* Predefined / Filtered Locations List */}
-        {filteredLocations.map((item) => (
-          <TouchableOpacity
-            key={item.id}
-            style={styles.locationCardRow}
-            onPress={() => onSelectLocation(item.title)}
-            activeOpacity={0.7}
-          >
-            {/* Left Rounded Square Icon Badge */}
-            <View style={styles.iconSquareBadge}>
-              <Ionicons name={item.iconName} size={22} color="#777777" />
-            </View>
+        {/* Predefined / Filtered Locations List (uniquement lors d'une recherche) */}
+        {query.trim().length > 0 &&
+          filteredLocations.map((item) => (
+            <TouchableOpacity
+              key={item.id}
+              style={styles.locationCardRow}
+              onPress={() => onSelectLocation(item.title)}
+              activeOpacity={0.7}
+            >
+              {/* Left Rounded Square Icon Badge */}
+              <View style={styles.iconSquareBadge}>
+                <Ionicons name={item.iconName} size={22} color="#777777" />
+              </View>
 
-            {/* Center Title and Subtitle */}
-            <View style={styles.locationTextCol}>
-              <Text style={styles.locationTitle} numberOfLines={1}>
-                {item.title}
-              </Text>
-              <Text style={styles.locationSubtitle} numberOfLines={1}>
-                {item.subtitle}
-              </Text>
-            </View>
+              {/* Center Title and Subtitle */}
+              <View style={styles.locationTextCol}>
+                <Text style={styles.locationTitle} numberOfLines={1}>
+                  {item.title}
+                </Text>
+                <Text style={styles.locationSubtitle} numberOfLines={1}>
+                  {item.subtitle}
+                </Text>
+              </View>
 
-            {/* Right Duration Metric */}
-            {item.duration && (
-              <Text style={styles.durationText}>{item.duration}</Text>
-            )}
-          </TouchableOpacity>
-        ))}
+              {/* Right Duration Metric */}
+              {item.duration && (
+                <Text style={styles.durationText}>{item.duration}</Text>
+              )}
+            </TouchableOpacity>
+          ))}
       </ScrollView>
     </View>
   );
@@ -384,5 +450,43 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#888888',
     textAlign: 'center',
+  },
+  shortcutsHeaderSection: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 4,
+  },
+  shortcutsTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#8E8E93',
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+    marginBottom: 8,
+  },
+  shortcutsScrollContainer: {
+    gap: 8,
+    paddingRight: 16,
+  },
+  shortcutChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F2F2F4',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    gap: 6,
+  },
+  shortcutIconCircle: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  shortcutChipText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#000000',
   },
 });

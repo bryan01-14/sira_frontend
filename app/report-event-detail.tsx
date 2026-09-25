@@ -17,6 +17,7 @@ import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { CustomBottomTabBar } from '@/components/custom-bottom-tab-bar';
+import { OsmMapView } from '@/components/osm-map-view';
 
 const { width, height } = Dimensions.get('window');
 
@@ -95,20 +96,13 @@ export default function ReportEventDetailScreen() {
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
           >
-            {/* Upper Map Section */}
+            {/* Upper Map Section avec la vraie carte interactive */}
             <View style={styles.mapContainer}>
-              <Image
-                source={require('@/assets/images/explore-map-bg.png')}
+              <OsmMapView
+                departureName={locationText}
+                arrivalName="Plateau Cité Administrative"
                 style={styles.mapImage}
-                contentFit="cover"
               />
-              {/* Map Location Pulse Pin Pinpoint */}
-              <View style={styles.mapCenterPin}>
-                <View style={styles.pinPulseRing} />
-                <View style={styles.pinBadgeCircle}>
-                  <Ionicons name="location" size={20} color="#FFFFFF" />
-                </View>
-              </View>
             </View>
 
             {/* Bottom Form Sheet Card */}

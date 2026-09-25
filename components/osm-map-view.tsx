@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { StyleSheet, View, ViewStyle, Text } from 'react-native';
+import { StyleSheet, View, ViewStyle, Text, TouchableOpacity } from 'react-native';
 import MapView, {
   Marker,
   Polyline,
@@ -17,6 +17,7 @@ interface OsmMapViewProps {
   routeCoordinates?: { latitude: number; longitude: number }[];
   style?: ViewStyle;
   showIntermediateStations?: boolean;
+  showZoomControls?: boolean;
 }
 
 // Default Abidjan initial region
@@ -34,25 +35,33 @@ const INTERMEDIATE_STATIONS = [
   { name: "Cocody Riviera 3", latitude: 5.3480, longitude: -3.9650 },
 ];
 
-export function OsmMapView({
+export function OsmMapViewComponent({
   departureName = 'Abobo Terminus',
   arrivalName = 'Orange Digital Center',
   routeCoordinates: externalRoute = [],
   style,
   showIntermediateStations = true,
+  showZoomControls = false,
 }: OsmMapViewProps) {
   const mapRef = useRef<MapView>(null);
   const [fetchedRoute, setFetchedRoute] = useState<{ latitude: number; longitude: number }[]>([]);
+  const currentRegionRef = useRef(ABIDJAN_REGION);
 
-  const startCoords =
-    ABIDJAN_COORDINATES_MAP[departureName] ||
-    ABIDJAN_COORDINATES_MAP['Abobo Samaké'] ||
-    { latitude: 5.4160, longitude: -4.0150 };
+  const startCoords = React.useMemo(() => {
+    return (
+      ABIDJAN_COORDINATES_MAP[departureName] ||
+      ABIDJAN_COORDINATES_MAP['Abobo Samaké'] ||
+      { latitude: 5.4160, longitude: -4.0150 }
+    );
+  }, [departureName]);
 
-  const endCoords =
-    ABIDJAN_COORDINATES_MAP[arrivalName] ||
-    ABIDJAN_COORDINATES_MAP['Orange Digital Center'] ||
-    { latitude: 5.3260, longitude: -4.0198 };
+  const endCoords = React.useMemo(() => {
+    return (
+      ABIDJAN_COORDINATES_MAP[arrivalName] ||
+      ABIDJAN_COORDINATES_MAP['Orange Digital Center'] ||
+      { latitude: 5.3260, longitude: -4.0198 }
+    );
+  }, [arrivalName]);
 
   // Fetch real OSRM driving route if external coordinates are not provided
   useEffect(() => {
@@ -90,6 +99,28 @@ export function OsmMapView({
     }
   }, [activeRoute, departureName, arrivalName]);
 
+  const zoomRegionByFactor = (factor: number) => {
+    const cur = currentRegionRef.current;
+    const nextLatDelta = Math.max(0.0015, Math.min(2.0, cur.latitudeDelta * factor));
+    const nextLngDelta = Math.max(0.0015, Math.min(2.0, cur.longitudeDelta * factor));
+    const nextRegion = {
+      latitude: cur.latitude,
+      longitude: cur.longitude,
+      latitudeDelta: nextLatDelta,
+      longitudeDelta: nextLngDelta,
+    };
+    currentRegionRef.current = nextRegion;
+    mapRef.current?.animateToRegion(nextRegion, 250);
+  };
+
+  const handleZoomIn = () => {
+    zoomRegionByFactor(0.4);
+  };
+
+  const handleZoomOut = () => {
+    zoomRegionByFactor(2.2);
+  };
+
   return (
     <View style={[styles.container, style]}>
       <MapView
@@ -97,6 +128,14 @@ export function OsmMapView({
         provider={PROVIDER_DEFAULT}
         style={styles.map}
         initialRegion={ABIDJAN_REGION}
+        onRegionChangeComplete={(reg) => {
+          currentRegionRef.current = reg;
+        }}
+        zoomEnabled={true}
+        scrollEnabled={true}
+        pitchEnabled={true}
+        rotateEnabled={true}
+        zoomControlEnabled={false}
         showsUserLocation={false}
         showsCompass={false}
         showsBuildings={true}
@@ -104,7 +143,12 @@ export function OsmMapView({
       >
         {/* Departure Marker */}
         {startCoords && (
-          <Marker coordinate={startCoords} title={departureName} anchor={{ x: 0.5, y: 0.5 }}>
+          <Marker
+            coordinate={startCoords}
+            title={departureName}
+            anchor={{ x: 0.5, y: 0.5 }}
+            tracksViewChanges={false}
+          >
             <View style={styles.startMarkerBadge}>
               <View style={styles.startMarkerInnerDot} />
             </View>
@@ -119,6 +163,7 @@ export function OsmMapView({
               coordinate={{ latitude: station.latitude, longitude: station.longitude }}
               title={station.name}
               anchor={{ x: 0.5, y: 0.5 }}
+              tracksViewChanges={false}
             >
               <View style={styles.stationMarkerCircle}>
                 <Ionicons name="bus" size={10} color="#FFFFFF" />
@@ -128,7 +173,12 @@ export function OsmMapView({
 
         {/* Arrival Marker */}
         {endCoords && (
-          <Marker coordinate={endCoords} title={arrivalName} anchor={{ x: 0.5, y: 1 }}>
+          <Marker
+            coordinate={endCoords}
+            title={arrivalName}
+            anchor={{ x: 0.5, y: 1 }}
+            tracksViewChanges={false}
+          >
             <View style={styles.endMarkerBadge}>
               <Ionicons name="location" size={26} color="#F26522" />
             </View>
@@ -158,6 +208,19 @@ export function OsmMapView({
         )}
       </MapView>
 
+      {/* Floating Zoom Controls (+ / -) */}
+      {showZoomControls && (
+        <View style={styles.zoomButtonsContainer}>
+          <TouchableOpacity style={styles.zoomBtn} onPress={handleZoomIn} activeOpacity={0.8}>
+            <Ionicons name="add" size={20} color="#000000" />
+          </TouchableOpacity>
+          <View style={styles.zoomDivider} />
+          <TouchableOpacity style={styles.zoomBtn} onPress={handleZoomOut} activeOpacity={0.8}>
+            <Ionicons name="remove" size={20} color="#000000" />
+          </TouchableOpacity>
+        </View>
+      )}
+
       {/* Map Badge */}
       <View style={styles.osmBadge}>
         <Text style={styles.osmBadgeText}>Carte Abidjan SIRA GPS</Text>
@@ -165,6 +228,8 @@ export function OsmMapView({
     </View>
   );
 }
+
+export const OsmMapView = React.memo(OsmMapViewComponent);
 
 const styles = StyleSheet.create({
   container: {
@@ -220,6 +285,32 @@ const styles = StyleSheet.create({
     fontSize: 9.5,
     color: '#333333',
     fontWeight: '700',
+  },
+  zoomButtonsContainer: {
+    position: 'absolute',
+    top: 14,
+    right: 14,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 10,
+    elevation: 5,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    zIndex: 20,
+    overflow: 'hidden',
+  },
+  zoomBtn: {
+    width: 38,
+    height: 38,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+  },
+  zoomDivider: {
+    height: 1,
+    backgroundColor: '#E2E8F0',
+    width: '100%',
   },
 });
 

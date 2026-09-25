@@ -4,6 +4,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 import {
+  Alert,
   Dimensions,
   Platform,
   StyleSheet,
@@ -12,6 +13,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { OsmMapView } from '@/components/osm-map-view';
 
 const { width, height } = Dimensions.get('window');
 
@@ -27,13 +29,23 @@ interface NavigationStep {
 
 export default function NavigationActiveScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ destination?: string }>();
+  const params = useLocalSearchParams<{
+    departure?: string;
+    destination?: string;
+    mode?: string;
+    suboption?: string;
+    durationMinutes?: string;
+    distance?: string;
+  }>();
 
+  const departure = params.departure || 'Abobo Terminus';
   const targetDestination = params.destination || 'Orange Digital Center';
 
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [isVoiceMuted, setIsVoiceMuted] = useState(false);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
+  const [isHudMinimized, setIsHudMinimized] = useState(false);
+  const [showStepsDrawer, setShowStepsDrawer] = useState(false);
 
   const steps: NavigationStep[] = [
     {
@@ -79,55 +91,145 @@ export default function NavigationActiveScreen() {
   // Auto advance steps preview timer for simulation
   useEffect(() => {
     const timer = setInterval(() => {
-      setCurrentStepIndex((prev) => (prev < steps.length - 1 ? prev + 1 : prev));
+      setCurrentStepIndex((prev) => {
+        const next = prev < steps.length - 1 ? prev + 1 : prev;
+        if (next === steps.length - 1 && prev !== steps.length - 1) {
+          setShowTripCompletedModal(true);
+        }
+        return next;
+      });
     }, 12000);
     return () => clearInterval(timer);
   }, []);
+
+  const [showTripCompletedModal, setShowTripCompletedModal] = useState(false);
+  const [showRatingModal, setShowRatingModal] = useState(false);
+  const [showThankYouModal, setShowThankYouModal] = useState(false);
+  const [starRating, setStarRating] = useState(5);
+  const [selectedFeedbackTags, setSelectedFeedbackTags] = useState<string[]>([]);
+
+  const handleNextStep = () => {
+    setCurrentStepIndex((prev) => {
+      const nextIdx = prev < steps.length - 1 ? prev + 1 : prev;
+      if (nextIdx === steps.length - 1) {
+        setShowTripCompletedModal(true);
+      }
+      return nextIdx;
+    });
+  };
+
+  const handlePrevStep = () => {
+    setCurrentStepIndex((prev) => (prev > 0 ? prev - 1 : prev));
+  };
+
+  const handleConfirmArrival = () => {
+    setShowTripCompletedModal(false);
+    setShowRatingModal(true);
+  };
+
+  const handleSubmitRating = () => {
+    setShowRatingModal(false);
+    setShowThankYouModal(true);
+  };
 
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
 
-      {/* Full Screen 3D Live Map View */}
-      <Image
-        source={require('@/assets/images/city-route-3d-bg.jpg')}
+      {/* Full Screen Live Interactive OsmMapView avec l'itinéraire choisi */}
+      <OsmMapView
         style={styles.fullMapImage}
-        contentFit="cover"
+        departureName={departure}
+        arrivalName={targetDestination}
       />
 
       {/* Overlay Safe Area */}
-      <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+      <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']} pointerEvents="box-none">
         {/* Top Turn-by-Turn Instruction Banner (HUD) */}
-        <View style={styles.topHudCard}>
-          <View style={styles.hudHeaderRow}>
-            <View style={[styles.directionIconCircle, { backgroundColor: currentStep.modeColor }]}>
-              <Ionicons name={currentStep.icon} size={26} color="#FFFFFF" />
+        {isHudMinimized ? (
+          <TouchableOpacity
+            style={styles.restoreHudPill}
+            onPress={() => setIsHudMinimized(false)}
+            activeOpacity={0.88}
+          >
+            <View style={[styles.directionIconCircleSmall, { backgroundColor: currentStep.modeColor }]}>
+              <Ionicons name={currentStep.icon} size={15} color="#FFFFFF" />
             </View>
-            <View style={styles.hudTextCol}>
-              <Text style={styles.hudInstructionText}>{currentStep.instruction}</Text>
-              <Text style={styles.hudSubtext}>{currentStep.subtext}</Text>
+            <Text style={styles.restoreHudText} numberOfLines={1}>
+              {currentStep.instruction}
+            </Text>
+            <View style={styles.restoreExpandBadge}>
+              <Ionicons name="chevron-down" size={14} color="#FFFFFF" />
             </View>
-            <TouchableOpacity
-              onPress={() => setShowExitConfirm(true)}
-              style={styles.exitNavBtn}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="close-circle" size={30} color="#FFFFFF" />
-            </TouchableOpacity>
-          </View>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            style={styles.topHudCard}
+            onPress={() => setShowStepsDrawer(true)}
+            activeOpacity={0.92}
+          >
+            <View style={styles.hudHeaderRow}>
+              <TouchableOpacity
+                onPress={(e) => {
+                  e.stopPropagation();
+                  handlePrevStep();
+                }}
+                disabled={currentStepIndex === 0}
+                style={{ opacity: currentStepIndex === 0 ? 0.3 : 1, paddingRight: 6 }}
+              >
+                <Ionicons name="chevron-back" size={20} color="#FFFFFF" />
+              </TouchableOpacity>
 
-          {/* Quick Distance & Time Countdown Bar inside Top HUD */}
-          <View style={styles.hudBottomRow}>
-            <View style={styles.hudMetricBadge}>
-              <Ionicons name="navigate-outline" size={14} color="#FFFFFF" />
-              <Text style={styles.hudMetricText}>Reste : {currentStep.distanceRemaining}</Text>
+              <View style={[styles.directionIconCircle, { backgroundColor: currentStep.modeColor }]}>
+                <Ionicons name={currentStep.icon} size={24} color="#FFFFFF" />
+              </View>
+
+              <View style={styles.hudTextCol}>
+                <Text style={styles.hudInstructionText}>{currentStep.instruction}</Text>
+                <Text style={styles.hudSubtext}>{currentStep.subtext}</Text>
+              </View>
+
+              <TouchableOpacity
+                onPress={(e) => {
+                  e.stopPropagation();
+                  handleNextStep();
+                }}
+                disabled={currentStepIndex === steps.length - 1}
+                style={{ opacity: currentStepIndex === steps.length - 1 ? 0.3 : 1, paddingLeft: 4, paddingRight: 6 }}
+              >
+                <Ionicons name="chevron-forward" size={20} color="#FFFFFF" />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={(e) => {
+                  e.stopPropagation();
+                  setIsHudMinimized(true);
+                }}
+                style={styles.exitNavBtn}
+                activeOpacity={0.8}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Ionicons name="close-circle" size={28} color="#FFFFFF" />
+              </TouchableOpacity>
             </View>
-            <View style={styles.hudMetricBadge}>
-              <Ionicons name="time-outline" size={14} color="#FFFFFF" />
-              <Text style={styles.hudMetricText}>Durée : {currentStep.timeRemaining}</Text>
+
+            {/* Quick Distance & Time Countdown Bar inside Top HUD */}
+            <View style={styles.hudBottomRow}>
+              <View style={styles.hudMetricBadge}>
+                <Ionicons name="navigate-outline" size={14} color="#FFFFFF" />
+                <Text style={styles.hudMetricText}>Reste : {currentStep.distanceRemaining}</Text>
+              </View>
+              <View style={styles.hudMetricBadge}>
+                <Ionicons name="time-outline" size={14} color="#FFFFFF" />
+                <Text style={styles.hudMetricText}>Durée : {currentStep.timeRemaining}</Text>
+              </View>
+              <View style={[styles.hudMetricBadge, { backgroundColor: 'rgba(242, 101, 34, 0.3)' }]}>
+                <Ionicons name="list" size={13} color="#FFFFFF" />
+                <Text style={styles.hudMetricText}>Toutes les étapes</Text>
+              </View>
             </View>
-          </View>
-        </View>
+          </TouchableOpacity>
+        )}
 
         {/* Map Side Quick Action Buttons (Right Side) */}
         <View style={styles.mapSideControls}>
@@ -228,6 +330,58 @@ export default function NavigationActiveScreen() {
           </View>
         </View>
 
+        {/* Full Steps & Lane Instructions Modal Drawer */}
+        {showStepsDrawer && (
+          <View style={styles.exitModalOverlay}>
+            <View style={[styles.exitModalCard, { width: '92%', maxWidth: 400, paddingVertical: 20 }]}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: 16 }}>
+                <Text style={{ fontSize: 18, fontWeight: '900', color: '#000000' }}>Instructions de voie</Text>
+                <TouchableOpacity onPress={() => setShowStepsDrawer(false)} style={{ padding: 4 }}>
+                  <Ionicons name="close-circle" size={24} color="#666666" />
+                </TouchableOpacity>
+              </View>
+
+              {steps.map((st, idx) => (
+                <TouchableOpacity
+                  key={st.id}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    paddingVertical: 10,
+                    paddingHorizontal: 12,
+                    borderRadius: 12,
+                    marginBottom: 8,
+                    backgroundColor: idx === currentStepIndex ? 'rgba(242, 101, 34, 0.12)' : '#F8FAFC',
+                    borderWidth: 1,
+                    borderColor: idx === currentStepIndex ? '#F26522' : '#E2E8F0',
+                  }}
+                  onPress={() => {
+                    setCurrentStepIndex(idx);
+                    setShowStepsDrawer(false);
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <View style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: st.modeColor, justifyContent: 'center', alignItems: 'center', marginRight: 12 }}>
+                    <Ionicons name={st.icon} size={18} color="#FFFFFF" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 13.5, fontWeight: '800', color: '#000000' }}>{st.instruction}</Text>
+                    <Text style={{ fontSize: 11.5, color: '#666666', marginTop: 2 }}>{st.subtext} • Reste : {st.distanceRemaining}</Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+
+              <TouchableOpacity
+                style={[styles.confirmExitBtn, { marginTop: 12, width: '100%' }]}
+                onPress={() => setShowStepsDrawer(false)}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.confirmExitText}>Fermer</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
         {/* Exit Confirmation Modal Overlay */}
         {showExitConfirm && (
           <View style={styles.exitModalOverlay}>
@@ -257,6 +411,228 @@ export default function NavigationActiveScreen() {
                   <Text style={styles.confirmExitText}>Quitter</Text>
                 </TouchableOpacity>
               </View>
+            </View>
+          </View>
+        )}
+
+        {/* Trip Completed Confirmation Modal Overlay */}
+        {showTripCompletedModal && (
+          <View style={styles.exitModalOverlay}>
+            <View style={[styles.exitModalCard, { paddingVertical: 26, paddingHorizontal: 20 }]}>
+              <View
+                style={{
+                  width: 64,
+                  height: 64,
+                  borderRadius: 32,
+                  backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  marginBottom: 12,
+                }}
+              >
+                <Ionicons name="checkmark-circle" size={48} color="#10B981" />
+              </View>
+              <Text style={styles.exitModalTitle}>Trajet terminé !</Text>
+              <Text style={[styles.exitModalSub, { marginBottom: 12 }]}>
+                Vous êtes bien arrivé à votre destination :{'\n'}
+                <Text style={{ fontWeight: '900', color: '#0F172A' }}>{targetDestination}</Text>
+              </Text>
+
+              <View style={{ width: '100%', gap: 10, marginTop: 12 }}>
+                <TouchableOpacity
+                  style={{
+                    backgroundColor: '#F26522',
+                    paddingVertical: 14,
+                    borderRadius: 16,
+                    alignItems: 'center',
+                    shadowColor: '#F26522',
+                    shadowOffset: { width: 0, height: 4 },
+                    shadowOpacity: 0.3,
+                    shadowRadius: 6,
+                    elevation: 4,
+                  }}
+                  onPress={handleConfirmArrival}
+                  activeOpacity={0.88}
+                >
+                  <Text style={{ color: '#FFFFFF', fontSize: 15, fontWeight: '800' }}>
+                    Confirmer l'arrivée
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={{
+                    backgroundColor: '#F1F5F9',
+                    paddingVertical: 12,
+                    borderRadius: 16,
+                    alignItems: 'center',
+                  }}
+                  onPress={() => setShowTripCompletedModal(false)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={{ color: '#475569', fontSize: 13, fontWeight: '700' }}>
+                    Continuer la navigation
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        )}
+
+        {/* 5-Star Interactive Rating Modal Overlay */}
+        {showRatingModal && (
+          <View style={styles.exitModalOverlay}>
+            <View style={[styles.exitModalCard, { paddingVertical: 24, paddingHorizontal: 20 }]}>
+              <Image
+                source={require('@/assets/images/sira-character-assistant.png')}
+                style={{ width: 60, height: 70, marginBottom: 8 }}
+                contentFit="contain"
+              />
+
+              <Text style={{ fontSize: 19, fontWeight: '900', color: '#0F172A', textAlign: 'center' }}>
+                Notez votre expérience
+              </Text>
+              <Text style={{ fontSize: 12.5, color: '#64748B', textAlign: 'center', marginTop: 4, marginBottom: 14 }}>
+                Comment s'est passée votre navigation vers {targetDestination} ?
+              </Text>
+
+              {/* Interactive 5-Star Row */}
+              <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8, marginVertical: 6 }}>
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <TouchableOpacity
+                    key={star}
+                    onPress={() => setStarRating(star)}
+                    activeOpacity={0.7}
+                    style={{ padding: 4 }}
+                  >
+                    <Ionicons
+                      name={star <= starRating ? 'star' : 'star-outline'}
+                      size={36}
+                      color={star <= starRating ? '#F59E0B' : '#CBD5E1'}
+                    />
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <Text style={{ fontSize: 13, fontWeight: '800', color: '#F26522', marginTop: 2, marginBottom: 14 }}>
+                {starRating === 5 && '🌟 Excellent trajet !'}
+                {starRating === 4 && '😊 Très bon trajet'}
+                {starRating === 3 && '😐 Trajet moyen'}
+                {starRating === 2 && '😕 Passable'}
+                {starRating === 1 && '😞 À améliorer'}
+              </Text>
+
+              {/* Feedback Chip Options */}
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 6, marginBottom: 18 }}>
+                {['Itinéraire précis', 'Assistant vocal clair', 'Trafic exact', 'Gain de temps'].map((tag) => {
+                  const isSelected = selectedFeedbackTags.includes(tag);
+                  return (
+                    <TouchableOpacity
+                      key={tag}
+                      onPress={() => {
+                        if (isSelected) {
+                          setSelectedFeedbackTags(selectedFeedbackTags.filter((t) => t !== tag));
+                        } else {
+                          setSelectedFeedbackTags([...selectedFeedbackTags, tag]);
+                        }
+                      }}
+                      style={{
+                        paddingHorizontal: 12,
+                        paddingVertical: 6,
+                        borderRadius: 20,
+                        backgroundColor: isSelected ? '#F26522' : '#F1F5F9',
+                        borderWidth: 1,
+                        borderColor: isSelected ? '#F26522' : '#E2E8F0',
+                      }}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={{ fontSize: 11.5, fontWeight: '700', color: isSelected ? '#FFFFFF' : '#475569' }}>
+                        {tag}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              <View style={{ width: '100%', gap: 8 }}>
+                <TouchableOpacity
+                  style={{
+                    backgroundColor: '#F26522',
+                    paddingVertical: 14,
+                    borderRadius: 16,
+                    alignItems: 'center',
+                    shadowColor: '#F26522',
+                    shadowOffset: { width: 0, height: 4 },
+                    shadowOpacity: 0.3,
+                    shadowRadius: 6,
+                    elevation: 4,
+                  }}
+                  onPress={handleSubmitRating}
+                  activeOpacity={0.88}
+                >
+                  <Text style={{ color: '#FFFFFF', fontSize: 15, fontWeight: '800' }}>
+                    Envoyer ma note
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={{
+                    paddingVertical: 10,
+                    alignItems: 'center',
+                  }}
+                  onPress={() => router.push('/(tabs)')}
+                  activeOpacity={0.7}
+                >
+                  <Text style={{ color: '#94A3B8', fontSize: 13, fontWeight: '600' }}>
+                    Passer cette étape
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        )}
+
+        {/* Thank You Modal Overlay */}
+        {showThankYouModal && (
+          <View style={styles.exitModalOverlay}>
+            <View style={[styles.exitModalCard, { paddingVertical: 26, paddingHorizontal: 20 }]}>
+              <View
+                style={{
+                  width: 64,
+                  height: 64,
+                  borderRadius: 32,
+                  backgroundColor: 'rgba(242, 101, 34, 0.12)',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  marginBottom: 12,
+                }}
+              >
+                <Ionicons name="heart" size={40} color="#F26522" />
+              </View>
+              <Text style={styles.exitModalTitle}>Merci pour votre avis !</Text>
+              <Text style={styles.exitModalSub}>
+                Votre retour nous aide à améliorer SIRA pour tous les usagers d'Abidjan.
+              </Text>
+              <TouchableOpacity
+                style={{
+                  width: '100%',
+                  backgroundColor: '#F26522',
+                  paddingVertical: 14,
+                  borderRadius: 16,
+                  alignItems: 'center',
+                  marginTop: 20,
+                  shadowColor: '#F26522',
+                  shadowOffset: { width: 0, height: 4 },
+                  shadowOpacity: 0.3,
+                  shadowRadius: 6,
+                  elevation: 4,
+                }}
+                onPress={() => router.push('/(tabs)')}
+                activeOpacity={0.88}
+              >
+                <Text style={{ color: '#FFFFFF', fontSize: 15, fontWeight: '800' }}>
+                  Retour à l'accueil
+                </Text>
+              </TouchableOpacity>
             </View>
           </View>
         )}
@@ -292,6 +668,45 @@ const styles = StyleSheet.create({
     elevation: 8,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  restoreHudPill: {
+    marginHorizontal: 16,
+    marginTop: Platform.OS === 'android' ? 10 : 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1E293B',
+    borderRadius: 24,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    gap: 8,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+  },
+  directionIconCircleSmall: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  restoreHudText: {
+    flex: 1,
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  restoreExpandBadge: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   hudHeaderRow: {
     flexDirection: 'row',
