@@ -1,50 +1,147 @@
-# Welcome to your Expo app 👋
+# SIRA — On trace, sans stress
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+SIRA aide les voyageurs du Grand Abidjan à choisir leur trajet en combinant **bus SOTRA, gbaka, wôrô-wôrô, bateau-bus, taxi et marche**, selon le prix, le temps et le confort. Les trajets sont rangés en trois catégories : **Coulé** (le moins cher), **Debout** (le juste milieu) et **Suspendu** (le plus confortable). Les voyageurs signalent les incidents en direct, comme sur Waze.
 
-## Get started
+Références produit : **Bonjour RATP** (recherche, comparaison, détail) et **Orange Max it** (connexion par numéro Orange 07 et code SMS).
 
-1. Install dependencies
+## Où se trouve quoi
 
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
+```text
+SIRA/
+├── mobile/              L'APPLI : Expo / React Native (Android, iPhone, web)      → port 8081
+├── services/            CE QUI TOURNE DERRIÈRE L'APPLI
+│   ├── api/             porte d'entrée : trajets, signalements, comptes, voix      → port 4000
+│   ├── engine/          SIRA-MORE : classe les trajets Coulé / Debout / Suspendu   → port 8000
+│   ├── community/       comptes (code SMS Orange) et prix des voyageurs            → port 8100
+│   ├── voice/           assistant vocal fr-CI (Whisper, CamemBERT, Piper) + FAQ    → port 8200
+│   └── models/          modèles d'IA des services (hors Git, voir models/README.md)
+├── data/                données de transport (325 lignes du Grand Abidjan)
+├── infra/               serveur : compose.yaml (Podman), Nginx, base PostGIS
+├── scripts/             lancer la stack, installer la voix, outils de données
+├── tests/               tests des données de transport
+└── docs/                documentation, cahier des charges, travail sur la voix
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+Règles : l'appli ne parle qu'à `services/api` ; rien de lourd ni de secret dans Git (modèles, données, `.env`, bases).
 
-## Learn more
+## Lancer SIRA sur son ordinateur
 
-To learn more about developing your project with Expo, look at the following resources:
+Prérequis : **Node.js 22** et **Python 3**. Une seule commande lance tout (SIRA-MORE, comptes, voix, API et appli) :
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+```bash
+npm install
+npm install --prefix mobile   # la première fois seulement
+npm run dev:stack
+```
 
-## Join the community
+Sous Windows, on peut aussi double-cliquer sur `LANCER_SIRA_WINDOWS.bat`.
 
-Join our community of developers creating universal apps.
+- **Navigateur** : `http://localhost:8081`.
+- **Téléphone** : scanner le QR code affiché avec **Expo Go** (téléphone et ordinateur sur le même Wi-Fi ;
+  la première fois, accepter la demande du pare-feu Windows pour Node).
+- L'appli déjà lancée à part (`npx expo start` dans `mobile/`) ? La stack la détecte et ne la relance pas
+  (`SIRA_MOBILE=false` pour ne jamais la lancer).
+- L'assistant vocal démarre s'il est installé (`npm run voice:setup`, une fois).
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+**Connexion** : numéro **Orange (07)** puis code à 4 chiffres. En développement, le code s'affiche à l'écran, sans SMS.
+
+**Sur un serveur** : `podman compose -f infra/compose.yaml up -d` (voir [docs/architecture.md](docs/architecture.md)).
+
+## Tester sur téléphone
+
+`npm run dev:stack` affiche l'adresse à ouvrir sur le téléphone (elle change avec le réseau) et prévient
+de ce qui bloquerait :
+
+```text
+[SIRA] Sur téléphone (même Wi-Fi, Wi-Fi) : http://192.168.x.x:8081
+[SIRA] Test API depuis le téléphone : http://192.168.x.x:4000/api/v1/health
+[SIRA] Micro et GPS : HTTPS nécessaire -> npm run dev:tunnel, ou l'appli Expo Go (QR code)
+```
+
+1. **Même Wi-Fi** pour le PC et le téléphone. Certains Wi-Fi (école, hôtel, box en mode invité) isolent les
+   appareils entre eux : utiliser alors le **partage de connexion du téléphone** pour le PC.
+2. **Pare-feu Windows**, une seule fois : PowerShell **en administrateur**, puis
+   `powershell -ExecutionPolicy Bypass -File scripts\windows\autoriser-telephone.ps1`.
+   Il ouvre les ports 8081 et 4000 **uniquement en profil Privé et pour le réseau local**, et propose de passer
+   le réseau en **Privé** (un réseau en « Public » bloque toujours le téléphone ; ne le faire que sur un réseau
+   de confiance). Pour tout retirer : `scripts\windows\retirer-regles-telephone.ps1`.
+3. **VPN** : le désactiver sur le PC et sur le téléphone pendant les tests.
+4. Ouvrir d'abord `http://<IP>:4000/api/v1/health` sur le téléphone : si ça ne répond pas, le souci est réseau
+   (pare-feu, Wi-Fi isolé, VPN), pas l'appli.
+5. **Micro et GPS** : Safari et Chrome ne les donnent qu'en **HTTPS** (ou sur `localhost`). Sur `http://<IP>:8081`,
+   l'appli le dit (« nécessite une connexion sécurisée ») ; il reste le choix sur la carte et l'écrit.
+   Pour les tester : `npm run dev:tunnel` (HTTPS, voir ci-dessous) ou **Expo Go**.
+
+| Où | Adresse | Écrans et trajets | Micro | « Ma position » (GPS) |
+| --- | --- | --- | --- | --- |
+| Navigateur du PC | `http://localhost:8081` | ✅ | ✅ | ✅ |
+| Navigateur du téléphone | `http://<IP>:8081` | ✅ | ❌ (HTTPS requis) | ❌ (HTTPS requis) |
+| Navigateur du téléphone | tunnel `https://…trycloudflare.com` | ✅ | ✅ | ✅ |
+| Expo Go (QR code) | appli native | ✅ | ✅ | ✅ |
+
+**Tunnel HTTPS** (`npm run dev:tunnel`, avec `npm run dev:stack` déjà lancé) : installer une fois
+`winget install Cloudflare.cloudflared`. Le script ouvre un tunnel vers l'API, lance l'appli (port 8081, ou 8082
+si le premier Expo tourne déjà) avec `EXPO_PUBLIC_API_URL` pointant sur ce tunnel (sans modifier `mobile/.env`),
+puis ouvre un tunnel vers l'appli et affiche l'adresse à ouvrir. **Le PC est accessible depuis Internet tant que
+le terminal est ouvert** (Ctrl+C ferme tout) ; ne pas partager le lien : en développement le code SMS s'affiche
+à l'écran. Si le script échoue, procédure manuelle :
+
+```bash
+cloudflared tunnel --url http://localhost:4000        # note l'adresse https de l'API
+cd mobile
+set EXPO_PUBLIC_API_URL=https://<adresse-api>.trycloudflare.com/api/v1
+npx expo start --port 8082
+cloudflared tunnel --url http://localhost:8082        # adresse à ouvrir sur le téléphone
+```
+
+Si `mobile/.env` contient `EXPO_PUBLIC_API_URL`, l'appli appelle cette adresse au lieu du PC : `dev:stack`
+le signale.
+
+## Où modifier quoi
+
+| Je veux changer… | Fichier(s) |
+| --- | --- |
+| Un écran de l'appli | `mobile/app/` (un fichier par écran) |
+| L'appel à l'API depuis l'appli | `mobile/lib/sira-api.ts` (seul point d'accès) |
+| La connexion, la session | `mobile/lib/session.ts`, `mobile/lib/use-otp-login.ts`, `services/community/` |
+| Le calcul des trajets | `services/api/src/mobility/` (graphe : `transport-graph.ts`) |
+| Le classement Coulé / Debout / Suspendu | `services/engine/app/engine.py` (SIRA-MORE) |
+| Les signalements | `services/api/src/reports/`, `mobile/lib/reports.ts` |
+| L'assistant vocal (compréhension, réponses) | `services/voice/app/` (`dialog.py` pour les phrases de réponse) |
+| Les réponses de la FAQ de SIRA | `services/voice/knowledge/*.md` (une fiche par question, voir `knowledge/README.md`) |
+| L'écran « Discuter avec SIRA » | `mobile/app/chat.tsx` |
+| L'écran « Confidentialité », la suppression de compte | `mobile/app/privacy.tsx`, `services/community/app/main.py` |
+| Les modèles d'IA (voix) | `services/models/voice/` (hors Git, voir `services/models/README.md`) |
+| Les lieux, « Ma position », la carte | `mobile/lib/places.ts`, `mobile/components/osm-map-view*.tsx` |
+
+## Vérifier que tout marche
+
+```bash
+npm test                                   # données de transport
+npm --prefix services/api test             # API (trajets, signalements, comptes)
+npm run test:ai                            # SIRA-MORE (services/engine)
+npm run test:community                     # comptes, suppression de compte, codes SMS
+npm run test:voice                         # assistant vocal (sans les gros modèles)
+npm run test:runtime                       # l'API appelle bien SIRA-MORE, de bout en bout
+npx --prefix mobile tsc --noEmit -p mobile # typage de l'appli mobile
+```
+
+## Équipe
+
+| Partie | Auteur | Dossier |
+| --- | --- | --- |
+| Application mobile (maquette validée) | Banatou | `mobile/` |
+| Moteur de trajets, signalements | Achille | `services/api`, `services/engine` |
+| Comptes SMS Orange, tarifs communautaires | Abraham (logique reprise sans ses secrets) | `services/community` |
+| Assistant vocal (dataset fr-CI, modèles, service) | Achille | `services/voice` |
+
+## Pour aller plus loin
+
+- [Architecture technique](docs/architecture.md) : ports, API, moteur, données, sécurité, limites
+- [Assistant vocal](services/voice/README.md) : installation, modèles, API, limites
+- [Documentation](docs/README.md) : cahier des charges, audits de données, PostGIS, voix
+- [Application mobile](mobile/README.md)
+- [Modèles d'IA](services/models/README.md) : lesquels, où, comment les changer
+- Ancien site web (port 3001) et dossier `archive/` : retirés, toujours consultables dans l'historique Git
+
+Les données de transport proviennent de data.gouv.ci (2021) : durées, attentes et tarifs restent des **estimations** à valider avec les opérateurs.

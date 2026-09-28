@@ -1,0 +1,149 @@
+# Stack serveur de SIRA (Podman ou Docker). Lancer depuis la racine du projet :
+#   podman compose -f infra/compose.yaml up -d
+# Les chemins ci-dessous sont relatifs à ce dossier (infra/).
+name: sira-mvp
+
+services:
+  # Seul point public. Sert l'appli web exportée (mobile/dist) et relaie /api/ et /socket.io/ vers l'API.
+  # Export web avant de lancer :  cd mobile && EXPO_PUBLIC_API_URL=https://<domaine>/api/v1 npx expo export -p web
+  # (adresse COMPLÈTE : l'appli en déduit aussi l'adresse des signalements en direct).
+  nginx:
+    image: docker.io/library/nginx:1.27-alpine
+    ports:
+      - "8080:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro,Z
+      - ../mobile/dist:/usr/share/nginx/html:ro,Z
+    depends_on: [api]
+    restart: unless-stopped
+
+  api:
+    build:
+      context: ../services/api
+      dockerfile: Containerfile
+    environment:
+      PORT: 4000
+      DATABASE_URL: postgresql://sira:sira_dev_password@postgres:5432/sira
+      VALKEY_URL: redis://valkey:6379/0
+      VALHALLA_URL: http://valhalla:8002
+      SIRA_JOURNEY_PROFILING: "true"
+      PHOTON_URL: https://photon.komoot.io
+      AI_URL: http://engine:8000  # SIRA-MORE (le nom de la variable est gardé tel quel)
+      COMMUNITY_URL: http://community:8100
+      VOICE_URL: http://voice:8200
+      SIRA_DATA_ROOT: /data
+      SIRA_GRAPH_WORKER: "true"
+      CORS_ORIGIN: http://localhost:8080
+      # production: only CORS_ORIGIN (services/api/src/cors.ts), like the community service.
+      SIRA_ENV: ${SIRA_ENV:-development}
+    volumes:
+      - ../data:/data:ro,Z
+    expose: ["4000"]
+    depends_on:
+      postgres: { condition: service_healthy }
+      valkey: { condition: service_healthy }
+      valhalla: { condition: service_healthy }
+    restart: unless-stopped
+
+  # SIRA-MORE : classe les trajets en Coulé / Debout / Suspendu. Privé : seule l'API l'appelle.
+  engine:
+    build:
+      context: ../services/engine
+      dockerfile: Containerfile
+    expose: ["8000"]
+    restart: unless-stopped
+
+  # Accounts (OTP Orange) and community fares, from the AKA branch.
+  # Secrets only come from the environment (see .env.example).
+  community:
+    build:
+      context: ../services/community
+      dockerfile: Containerfile
+    environment:
+      SIRA_ENV: ${SIRA_ENV:-development}
+      COMMUNITY_DATABASE_URL: postgresql+psycopg://sira:sira_dev_password@postgres:5432/sira
+      COMMUNITY_JWT_SECRET: ${COMMUNITY_JWT_SECRET:-}
+      ORANGE_CLIENT_ID: ${ORANGE_CLIENT_ID:-}
+      ORANGE_CLIENT_SECRET: ${ORANGE_CLIENT_SECRET:-}
+      ORANGE_SENDER_ADDRESS: ${ORANGE_SENDER_ADDRESS:-}
+    expose: ["8100"]
+    depends_on:
+      postgres: { condition: service_healthy }
+    restart: unless-stopped
+
+  # Assistant vocal (Whisper + CamemBERT fr-CI + Piper). Les modèles (≈ 1,4 Go) sont montés,
+  # pas copiés dans l'image : voir services/models/README.md.
+  voice:
+    build:
+      context: ../services/voice
+      dockerfile: Containerfile
+    environment:
+      SIRA_API_URL: http://api:4000/api/v1
+      VOICE_WHISPER_MODEL: ${VOICE_WHISPER_MODEL:-small}
+    volumes:
+      - ../services/models/voice:/models/voice:ro,Z
+      - voice_cache:/root/.cache:Z
+    expose: ["8200"]
+    restart: unless-stopped
+
+  postgres:
+    image: docker.io/postgis/postgis:17-3.5-alpine
+    environment:
+      POSTGRES_DB: sira
+      POSTGRES_USER: sira
+      POSTGRES_PASSWORD: sira_dev_password
+    # Joignable seulement depuis la machine elle-même (outils d'import), jamais depuis le réseau.
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data:Z
+      - ./database/init:/docker-entrypoint-initdb.d:ro,Z
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sira -d sira"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+    restart: unless-stopped
+
+  valkey:
+    image: docker.io/valkey/valkey:8-alpine
+    command: ["valkey-server", "--appendonly", "yes", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
+    volumes:
+      - valkey_data:/data:Z
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  valhalla:
+    image: ghcr.io/valhalla/valhalla-scripted:latest
+    environment:
+      # BBBike mirrors the daily OpenStreetMap Côte d'Ivoire PBF and is reachable from the container.
+      tile_urls: https://data.bbbike.org/osm/pbf/region/africa/ivory-coast.osm.pbf
+      serve_tiles: "True"
+      build_admins: "True"
+      build_time_zones: "True"
+      build_transit: "True"
+      use_tiles_ignore_pbf: "False"
+      force_rebuild: "False"
+    volumes:
+      - valhalla_data:/custom_files:Z
+      - ../data/gtfs-demo:/gtfs_feeds/abidjan:ro,Z
+    # Joignable seulement depuis la machine elle-même (tests de routage), jamais depuis le réseau.
+    ports:
+      - "127.0.0.1:8002:8002"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8002/status >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20m
+    restart: unless-stopped
+
+volumes:
+  voice_cache:
+  postgres_data:
+  valkey_data:
+  valhalla_data:
