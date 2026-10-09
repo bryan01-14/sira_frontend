@@ -12,7 +12,7 @@ import {
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { CustomBottomTabBar } from '@/components/custom-bottom-tab-bar';
 import { OsmMapView } from '@/components/osm-map-view';
@@ -102,6 +102,7 @@ const MOCK_INCIDENTS: TrafficIncident[] = [
 
 export default function TrafficScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [isSearching, setIsSearching] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedIncident, setSelectedIncident] = useState<TrafficIncident | null>(null);
@@ -310,7 +311,7 @@ export default function TrafficScreen() {
       </SafeAreaView>
 
       {/* Floating Bottom Incident Category Panel (Floating above Bottom Navigation Bar) */}
-      <View style={styles.bottomFloatingPanelWrapper}>
+      <View style={[styles.bottomFloatingPanelWrapper, { bottom: 84 + (insets.bottom || 10) }]}>
         <View style={styles.categoryCardPanel}>
           <TouchableOpacity
             style={styles.categoryItem}
@@ -441,8 +442,22 @@ export default function TrafficScreen() {
                   <TouchableOpacity
                     style={styles.modalPrimaryButton}
                     onPress={() => {
+                      const inc = selectedIncident;
                       setSelectedIncident(null);
-                      router.push('/notification-accident-detail');
+                      if (inc) {
+                        router.push({
+                          pathname: '/notification-accident-detail',
+                          params: {
+                            id: inc.id,
+                            type: inc.type,
+                            title: inc.title,
+                            message: inc.description,
+                            location: inc.location,
+                          },
+                        });
+                      } else {
+                        router.push('/notification-accident-detail');
+                      }
                     }}
                     activeOpacity={0.8}
                   >

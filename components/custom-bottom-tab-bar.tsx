@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter, usePathname } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-export type TabPath = 'explore' | 'routes' | 'alerts' | 'profile';
+export type TabPath = 'explore' | 'routes' | 'alerts' | 'profile' | 'none';
 
 interface CustomBottomTabBarProps {
   activeTab?: TabPath;
@@ -15,16 +15,18 @@ export function CustomBottomTabBar({ activeTab }: CustomBottomTabBarProps) {
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
 
-  // Determine active tab dynamically if not passed explicitly
-  const currentTab: TabPath = activeTab || (
-    pathname.includes('traffic') || pathname.includes('route-detail') || pathname.includes('navigation-active')
-      ? 'routes'
-      : pathname.includes('report-event') || pathname.includes('notifications') || pathname.includes('accident')
-      ? 'alerts'
-      : pathname.includes('profile')
-      ? 'profile'
-      : 'explore'
-  );
+  // Determine active tab dynamically if not passed explicitly (supports 'none' to disable active badge)
+  const currentTab: TabPath = activeTab !== undefined
+    ? activeTab
+    : (
+        pathname.includes('traffic') || pathname.includes('route-detail') || pathname.includes('navigation-active')
+          ? 'routes'
+          : pathname.includes('report-event') || pathname.includes('notifications') || pathname.includes('accident')
+          ? 'alerts'
+          : pathname.includes('profile')
+          ? 'profile'
+          : 'explore'
+      );
 
   const tabs: {
     id: TabPath;
@@ -84,7 +86,7 @@ export function CustomBottomTabBar({ activeTab }: CustomBottomTabBarProps) {
               <View style={styles.outerBlueBadge}>
                 {/* Inner Orange Circle */}
                 <View style={styles.innerOrangeBadge}>
-                  <Ionicons name={tab.iconActive} size={22} color="#FFFFFF" />
+                  <Ionicons name={tab.iconActive} size={26} color="#FFFFFF" />
                 </View>
               </View>
             </TouchableOpacity>
@@ -102,7 +104,7 @@ export function CustomBottomTabBar({ activeTab }: CustomBottomTabBarProps) {
             }}
             activeOpacity={0.7}
           >
-            <Ionicons name={tab.iconInactive} size={24} color="#D1D5DB" />
+            <Ionicons name={tab.iconInactive} size={29} color="#EAEAEA" />
           </TouchableOpacity>
         );
       })}
@@ -119,8 +121,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-around',
-    backgroundColor: '#333333',
-    paddingTop: 8,
+    backgroundColor: '#262626',
+    paddingTop: 10,
     paddingHorizontal: 8,
     zIndex: 100,
     ...Platform.select({
@@ -150,19 +152,19 @@ const styles = StyleSheet.create({
   },
   outerBlueBadge: {
     position: 'absolute',
-    top: -22,
-    width: 58,
-    height: 58,
-    borderRadius: 29,
-    backgroundColor: '#80C4FF',
+    top: -24,
+    width: 62,
+    height: 62,
+    borderRadius: 31,
+    backgroundColor: '#72B5FA',
     justifyContent: 'center',
     alignItems: 'center',
     ...Platform.select({
       ios: {
-        shadowColor: '#80C4FF',
+        shadowColor: '#72B5FA',
         shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.5,
-        shadowRadius: 6,
+        shadowOpacity: 0.6,
+        shadowRadius: 8,
       },
       android: {
         elevation: 8,
@@ -170,9 +172,9 @@ const styles = StyleSheet.create({
     }),
   },
   innerOrangeBadge: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 46,
+    height: 46,
+    borderRadius: 23,
     backgroundColor: '#F26522',
     justifyContent: 'center',
     alignItems: 'center',

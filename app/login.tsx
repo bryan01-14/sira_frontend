@@ -145,7 +145,7 @@ export default function LoginScreen() {
             {/* Input Field: Orange User Icon + Dark Pill */}
             <View style={styles.inputWrapper}>
               <View style={styles.iconCircle}>
-                <Ionicons name="person" size={17} color="#FFFFFF" />
+                <Ionicons name="call" size={17} color="#FFFFFF" />
               </View>
               <TextInput
                 style={styles.textInput}
@@ -294,6 +294,7 @@ const styles = StyleSheet.create({
   titleLine1: {
     color: '#FFFFFF',
     fontSize: 22,
+    fontFamily: 'Montserrat-Bold',
     fontWeight: '700',
     letterSpacing: 0,
     textAlign: 'center',
@@ -303,6 +304,7 @@ const styles = StyleSheet.create({
   titleLine2: {
     color: '#FFFFFF',
     fontSize: 22,
+    fontFamily: 'Montserrat-Bold',
     fontWeight: '700',
     letterSpacing: 0,
     textAlign: 'center',
@@ -316,6 +318,7 @@ const styles = StyleSheet.create({
   subtitle: {
     color: '#E0E0E0',
     fontSize: 13,
+    fontFamily: 'Montserrat-Regular',
     lineHeight: 19,
     textAlign: 'center',
     marginTop: 10,
@@ -323,6 +326,7 @@ const styles = StyleSheet.create({
   },
   subtitleBold: {
     color: '#FFFFFF',
+    fontFamily: 'Montserrat-Bold',
     fontWeight: '700',
   },
   inputWrapper: {
@@ -348,6 +352,7 @@ const styles = StyleSheet.create({
     flex: 1,
     color: '#FFFFFF',
     fontSize: 13,
+    fontFamily: 'Montserrat-Regular',
     fontWeight: '400',
     lineHeight: 20,
     letterSpacing: 0,
@@ -370,6 +375,7 @@ const styles = StyleSheet.create({
   loginButtonText: {
     color: '#FFFFFF',
     fontSize: 14,
+    fontFamily: 'Montserrat-Bold',
     fontWeight: '700',
     lineHeight: 20,
     letterSpacing: 0,

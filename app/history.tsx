@@ -154,7 +154,18 @@ export default function HistoryScreen() {
 
   const handleOpenDetail = (item: HistoryItem) => {
     setSelectedItem(item);
-    setIsDetailOpen(true);
+    router.push({
+      pathname: '/history-detail',
+      params: {
+        departure: item.departure,
+        arrival: item.arrival,
+        transport: item.transport,
+        option: item.option,
+        duration: item.duration,
+        costRange: item.costRange,
+        date: item.date,
+      },
+    });
   };
 
   const handleOpenMenu = (item: HistoryItem) => {
@@ -532,7 +543,7 @@ export default function HistoryScreen() {
       </Modal>
 
       {/* Bottom Navigation Bar */}
-      <CustomBottomTabBar />
+      <CustomBottomTabBar activeTab="none" />
     </View>
   );
 }

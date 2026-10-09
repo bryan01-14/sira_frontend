@@ -10,7 +10,6 @@ import {
   Platform,
   SafeAreaView,
   Share,
-  Alert,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
@@ -57,20 +56,29 @@ export function SideMenuModal({ visible, onClose }: SideMenuModalProps) {
       onRequestClose={onClose}
     >
       <View style={styles.overlayContainer}>
-        {/* Backdrop Touchable */}
+        {/* Backdrop Touchable (Fills Remaining Screen on LEFT) */}
         <TouchableOpacity
           style={styles.backdrop}
           activeOpacity={1}
           onPress={onClose}
         />
 
-        {/* Side Drawer Content */}
+        {/* Side Drawer Content (Anchored on the RIGHT) */}
         <View style={styles.drawerContent}>
           <SafeAreaView style={styles.safeArea}>
             {/* Header Road Graphics Banner */}
             <View style={styles.headerBanner}>
+              <TouchableOpacity
+                style={styles.closeButtonCircle}
+                onPress={onClose}
+                activeOpacity={0.8}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Ionicons name="close" size={18} color="#FFFFFF" />
+              </TouchableOpacity>
+
               {/* Road Diagonal Stripe Graphic & Slogan */}
-              <View style={styles.roadDecorWrapper}>
+              <View style={styles.roadDecorWrapper} pointerEvents="none">
                 <Image
                   source={require('@/assets/images/road-stripe.png')}
                   style={styles.roadStripeImage}
@@ -86,15 +94,6 @@ export function SideMenuModal({ visible, onClose }: SideMenuModalProps) {
                   />
                 </View>
               </View>
-
-              <TouchableOpacity
-                style={styles.closeButtonCircle}
-                onPress={onClose}
-                activeOpacity={0.8}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              >
-                <Ionicons name="close" size={18} color="#FFFFFF" />
-              </TouchableOpacity>
             </View>
 
             <ScrollView
@@ -122,7 +121,7 @@ export function SideMenuModal({ visible, onClose }: SideMenuModalProps) {
                 </View>
 
                 <View style={styles.smallChevronCircle}>
-                  <Ionicons name="chevron-forward" size={12} color="#FFFFFF" />
+                  <Ionicons name="chevron-forward" size={14} color="#FFFFFF" />
                 </View>
               </TouchableOpacity>
 
@@ -138,7 +137,7 @@ export function SideMenuModal({ visible, onClose }: SideMenuModalProps) {
                 activeOpacity={0.7}
               >
                 <View style={styles.iconCircleBadge}>
-                  <Ionicons name="time-outline" size={18} color="#F26522" />
+                  <Ionicons name="time" size={18} color="#F26522" />
                 </View>
                 <Text style={styles.menuItemText}>Historique</Text>
               </TouchableOpacity>
@@ -155,7 +154,7 @@ export function SideMenuModal({ visible, onClose }: SideMenuModalProps) {
                 activeOpacity={0.7}
               >
                 <View style={styles.iconCircleBadge}>
-                  <Ionicons name="car-sport" size={18} color="#F26522" />
+                  <Ionicons name="car" size={18} color="#F26522" />
                 </View>
                 <Text style={styles.menuItemText}>Trafic</Text>
               </TouchableOpacity>
@@ -186,7 +185,7 @@ export function SideMenuModal({ visible, onClose }: SideMenuModalProps) {
                 activeOpacity={0.7}
               >
                 <View style={styles.iconCircleBadge}>
-                  <Ionicons name="settings-outline" size={18} color="#F26522" />
+                  <Ionicons name="settings" size={18} color="#F26522" />
                 </View>
                 <Text style={styles.menuItemText}>Paramètres</Text>
               </TouchableOpacity>
@@ -195,11 +194,12 @@ export function SideMenuModal({ visible, onClose }: SideMenuModalProps) {
                 style={styles.menuItemRow}
                 onPress={() => {
                   onClose();
+                  router.push('/info-settings');
                 }}
                 activeOpacity={0.7}
               >
                 <View style={styles.iconCircleBadge}>
-                  <Ionicons name="information-circle-outline" size={18} color="#F26522" />
+                  <Ionicons name="information-circle" size={18} color="#F26522" />
                 </View>
                 <Text style={styles.menuItemText}>À propos de SIRA</Text>
               </TouchableOpacity>
@@ -210,7 +210,7 @@ export function SideMenuModal({ visible, onClose }: SideMenuModalProps) {
                 activeOpacity={0.7}
               >
                 <View style={styles.iconCircleBadge}>
-                  <Ionicons name="log-out-outline" size={18} color="#F26522" />
+                  <Ionicons name="log-out" size={18} color="#F26522" />
                 </View>
                 <Text style={styles.menuItemText}>Se déconnecter</Text>
               </TouchableOpacity>
@@ -227,7 +227,7 @@ export function SideMenuModal({ visible, onClose }: SideMenuModalProps) {
                     activeOpacity={0.85}
                   >
                     <View style={styles.shareIconCircle}>
-                      <Ionicons name="share-social" size={12} color="#F26522" />
+                      <Ionicons name="share-social" size={13} color="#F26522" />
                     </View>
                     <Text style={styles.shareButtonText}>Partager SIRA</Text>
                   </TouchableOpacity>
@@ -266,11 +266,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
   },
   backdrop: {
-    width: width * 0.15,
+    flex: 1,
     height: '100%',
   },
   drawerContent: {
-    width: width * 0.85,
+    width: Math.min(300, width * 0.73),
     height: '100%',
     backgroundColor: '#000000',
     ...Platform.select({
@@ -290,22 +290,22 @@ const styles = StyleSheet.create({
   },
   headerBanner: {
     height: 90,
-    paddingHorizontal: 14,
+    paddingHorizontal: 12,
     position: 'relative',
     justifyContent: 'center',
     overflow: 'hidden',
   },
   closeButtonCircle: {
     position: 'absolute',
-    left: 14,
-    top: 18,
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    left: 12,
+    top: 14,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     backgroundColor: '#F26522',
     justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 20,
+    zIndex: 25,
   },
   roadDecorWrapper: {
     position: 'absolute',
@@ -316,44 +316,46 @@ const styles = StyleSheet.create({
   },
   roadStripeImage: {
     position: 'absolute',
-    top: -4,
-    left: -20,
-    width: 370,
+    top: -2,
+    left: 15,
+    width: 300,
     height: 85,
     opacity: 0.95,
   },
   sloganContainer: {
     position: 'absolute',
-    top: 6,
-    left: 48,
+    top: 10,
+    left: 52,
     flexDirection: 'row',
     alignItems: 'center',
     transform: [{ rotate: '-11deg' }],
     zIndex: 10,
   },
   sloganWhite: {
-    fontSize: 13.5,
+    fontSize: 13,
     fontWeight: '800',
     color: '#FFFFFF',
     letterSpacing: 0.3,
+    fontFamily: 'Montserrat-Bold',
   },
   sloganOrange: {
-    fontSize: 13.5,
+    fontSize: 13,
     fontWeight: '800',
     color: '#F26522',
     letterSpacing: 0.3,
+    fontFamily: 'Montserrat-Bold',
   },
   locationPinDecor: {
-    width: 22,
-    height: 28,
-    marginLeft: 6,
+    width: 20,
+    height: 24,
+    marginLeft: 4,
     transform: [{ rotate: '14deg' }],
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 18,
+    paddingHorizontal: 14,
     paddingBottom: 24,
   },
   profileRow: {
@@ -370,7 +372,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#1A1A1A',
-    marginRight: 12,
+    marginRight: 10,
   },
   avatarImage: {
     width: 46,
@@ -382,100 +384,110 @@ const styles = StyleSheet.create({
   },
   userName: {
     fontSize: 17,
-    fontWeight: '700',
+    fontWeight: '800',
     color: '#FFFFFF',
     marginBottom: 2,
+    fontFamily: 'Montserrat-Bold',
   },
   userPhone: {
-    fontSize: 13,
-    color: '#AAAAAA',
+    fontSize: 12.5,
+    color: '#A0A0A0',
+    fontFamily: 'Montserrat-Regular',
   },
   smallChevronCircle: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
     backgroundColor: '#F26522',
     justifyContent: 'center',
     alignItems: 'center',
   },
   divider: {
     height: 1,
-    backgroundColor: '#1E1E1E',
+    backgroundColor: '#222222',
     marginVertical: 8,
   },
   menuItemRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 9,
+    paddingVertical: 10,
   },
   iconCircleBadge: {
     width: 34,
     height: 34,
     borderRadius: 17,
-    backgroundColor: '#1A1A1A',
+    backgroundColor: '#222222',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
   },
   menuItemText: {
     fontSize: 15,
-    fontWeight: '700',
+    fontWeight: '800',
     color: '#FFFFFF',
+    fontFamily: 'Montserrat-Bold',
   },
   promoCardContainer: {
     backgroundColor: '#262626',
-    borderRadius: 14,
-    padding: 12,
+    borderRadius: 16,
+    padding: 14,
     marginTop: 18,
     flexDirection: 'row',
     alignItems: 'center',
     position: 'relative',
     overflow: 'hidden',
+    minHeight: 115,
   },
   promoCardContent: {
     flex: 1,
+    paddingRight: 60,
     zIndex: 2,
   },
   promoTitle: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '900',
     color: '#FFFFFF',
+    fontFamily: 'Montserrat-Bold',
   },
   promoSub: {
-    fontSize: 14,
+    fontSize: 14.5,
     fontWeight: '600',
-    color: '#E0E0E0',
-    marginBottom: 8,
+    color: '#CCCCCC',
+    marginBottom: 10,
+    fontFamily: 'Montserrat-Regular',
   },
   shareButton: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#F26522',
-    borderRadius: 16,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    borderRadius: 22,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     alignSelf: 'flex-start',
+    gap: 8,
   },
   shareIconCircle: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     backgroundColor: '#FFFFFF',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 6,
   },
   shareButtonText: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '800',
     color: '#FFFFFF',
+    fontFamily: 'Montserrat-Bold',
   },
   promoIllustration: {
-    width: 110,
-    height: 72,
+    width: 135,
+    height: 95,
     position: 'absolute',
-    right: 0,
+    right: -4,
     bottom: 0,
     zIndex: 1,
   },
 });
+
+

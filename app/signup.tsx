@@ -143,7 +143,7 @@ export default function SignupScreen() {
               {/* Input 2: Numéro Orange */}
               <View style={styles.inputWrapper}>
                 <View style={styles.iconCircle}>
-                  <Ionicons name="person" size={17} color="#FFFFFF" />
+                  <Ionicons name="call" size={17} color="#FFFFFF" />
                 </View>
                 <TextInput
                   style={styles.textInput}
@@ -239,6 +239,7 @@ const styles = StyleSheet.create({
   taglineBlack: {
     color: '#111111',
     fontSize: 14,
+    fontFamily: 'Montserrat-Medium',
     fontWeight: '500',
     lineHeight: 15,
     letterSpacing: 0,
@@ -248,6 +249,7 @@ const styles = StyleSheet.create({
   taglineOrange: {
     color: '#F26522',
     fontSize: 14,
+    fontFamily: 'Montserrat-Medium',
     fontWeight: '500',
     lineHeight: 15,
     letterSpacing: 0,
@@ -297,6 +299,7 @@ const styles = StyleSheet.create({
   welcomeTitle: {
     color: '#000000',
     fontSize: 24,
+    fontFamily: 'Montserrat-Bold',
     fontWeight: '700',
     lineHeight: 28,
     letterSpacing: 0,
@@ -310,6 +313,7 @@ const styles = StyleSheet.create({
   welcomeSubtitle: {
     color: '#000000',
     fontSize: 16,
+    fontFamily: 'Montserrat-Medium',
     fontWeight: '500',
     lineHeight: 20,
     letterSpacing: 0,
@@ -339,6 +343,7 @@ const styles = StyleSheet.create({
     flex: 1,
     color: '#FFFFFF',
     fontSize: 13,
+    fontFamily: 'Montserrat-Regular',
     fontWeight: '400',
     lineHeight: 20,
     letterSpacing: 0,
@@ -362,6 +367,7 @@ const styles = StyleSheet.create({
   signupButtonText: {
     color: '#FFFFFF',
     fontSize: 13,
+    fontFamily: 'Montserrat-Bold',
     fontWeight: '800',
     letterSpacing: 0.6,
   },

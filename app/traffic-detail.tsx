@@ -56,7 +56,16 @@ export default function TrafficDetailScreen() {
   }, [activeCategory]);
 
   const handleOpenZoneDetail = (item: ZoneReportItem) => {
-    router.push('/notification-accident-detail');
+    router.push({
+      pathname: '/notification-accident-detail',
+      params: {
+        id: item.id,
+        type: item.category,
+        title: `Accident signalé sur le ${item.location}`,
+        message: `Un accident a été signalé sur le ${item.location} et pourrait entraîner un ralentissement d’environ 12 minutes sur votre trajet. SIRA a identifié une alternative pour vous permettre d’éviter la zone concernée.\n\nMettre toutes les infos concernant l’accident.`,
+        location: item.location,
+      },
+    });
   };
 
   const getCategoryTitle = () => {

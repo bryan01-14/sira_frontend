@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   StyleSheet,
   View,
@@ -7,20 +7,72 @@ import {
   ScrollView,
   Dimensions,
   Platform,
+  Alert,
+  Modal,
 } from 'react-native';
 import { Image } from 'expo-image';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { SideMenuModal } from '@/components/side-menu-modal';
 import { CustomBottomTabBar } from '@/components/custom-bottom-tab-bar';
+import { OsmMapView } from '@/components/osm-map-view';
 
-const { width, height } = Dimensions.get('window');
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 export default function NotificationAccidentDetailScreen() {
   const router = useRouter();
-  const [showSideMenu, setShowSideMenu] = React.useState(false);
+  const insets = useSafeAreaInsets();
+  const params = useLocalSearchParams<{
+    id?: string;
+    type?: string;
+    title?: string;
+    message?: string;
+    location?: string;
+    iconName?: string;
+  }>();
+
+  const [showSideMenu, setShowSideMenu] = useState(false);
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [followStep, setFollowStep] = useState<'none' | 'confirm' | 'success'>('none');
+
+  const displayLocation = params.location || 'Boulevard Latrille';
+  const displayTitle = params.title || `Accident signalé sur le ${displayLocation}`;
+  const headerTitle = displayTitle.startsWith('Trafic')
+    ? displayTitle
+    : `Trafic : ${params.type === 'embouteillage' ? 'Embouteillage' : 'Accident signalé'}`;
+
+  const displayMessage =
+    params.message ||
+    `Un accident a été signalé sur le ${displayLocation} et pourrait entraîner un ralentissement d’environ 12 minutes sur votre trajet. SIRA a identifié une alternative pour vous permettre d’éviter la zone concernée.\n\nMettre toutes les infos concernant l’accident.`;
+
+  const handleToggleFollow = () => {
+    if (isFollowing) {
+      setIsFollowing(false);
+      setFollowStep('none');
+    } else {
+      setFollowStep('confirm');
+    }
+  };
+
+  const handleConfirmFollow = () => {
+    setIsFollowing(true);
+    setFollowStep('success');
+    setTimeout(() => {
+      setFollowStep('none');
+    }, 2200);
+  };
+
+  const handleFindRoute = () => {
+    router.push({
+      pathname: '/recalculated-route',
+      params: {
+        departure: displayLocation,
+        arrival: 'Orange Digital Center',
+      },
+    });
+  };
 
   return (
     <View style={styles.container}>
@@ -33,18 +85,21 @@ export default function NotificationAccidentDetailScreen() {
         contentFit="cover"
       />
 
-      <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
         {/* Header Bar */}
         <View style={styles.headerBar}>
           <TouchableOpacity
             style={styles.backBtnWrapper}
             onPress={() => router.back()}
             activeOpacity={0.7}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
             <Ionicons name="arrow-back" size={24} color="#000000" />
           </TouchableOpacity>
 
-          <Text style={styles.headerTitle}>Accident signalé</Text>
+          <Text style={styles.headerTitle} numberOfLines={1}>
+            {headerTitle}
+          </Text>
 
           <View style={styles.headerRightActions}>
             <TouchableOpacity
@@ -63,7 +118,7 @@ export default function NotificationAccidentDetailScreen() {
               onPress={() => setShowSideMenu(true)}
               activeOpacity={0.8}
             >
-              <Ionicons name="menu" size={24} color="#000000" />
+              <Ionicons name="menu" size={26} color="#000000" />
             </TouchableOpacity>
           </View>
         </View>
@@ -71,30 +126,26 @@ export default function NotificationAccidentDetailScreen() {
         {/* Scrollable Responsive Body */}
         <ScrollView
           style={styles.mainScrollView}
-          contentContainerStyle={styles.mainScrollContent}
+          contentContainerStyle={[styles.mainScrollContent, { paddingBottom: 170 }]}
           showsVerticalScrollIndicator={false}
         >
           {/* Top Incident Details Section */}
           <View style={styles.alertContentContainer}>
             <View style={styles.accidentIconCircle}>
-              <Ionicons name="car-sport" size={26} color="#FFFFFF" />
+              <Ionicons name="car-sport" size={28} color="#FFFFFF" />
             </View>
 
-            <Text style={styles.alertMainTitle}>
-              Accident signalé sur votre itinéraire
-            </Text>
+            <Text style={styles.alertMainTitle}>{displayTitle}</Text>
 
-            <Text style={styles.alertDescriptionText}>
-              Un accident vient d’être signalé sur votre itinéraire actuel en direction de Cocody. L’incident a été signalé sur le Boulevard Latrille et pourrait entraîner un ralentissement d’environ 12 minutes sur votre trajet. SIRA a identifié une alternative pour vous permettre d’éviter la zone concernée.
-            </Text>
+            <Text style={styles.alertDescriptionText}>{displayMessage}</Text>
           </View>
 
-          {/* Map View Section */}
+          {/* Real Interactive Map View Section */}
           <View style={styles.mapSection}>
-            <Image
-              source={require('@/assets/images/map-abidjan-routes.png')}
+            <OsmMapView
+              departureName={displayLocation}
+              arrivalName="Orange Digital Center"
               style={styles.mapImage}
-              contentFit="cover"
             />
 
             {/* Compass Rose (Top Right) */}
@@ -109,7 +160,9 @@ export default function NotificationAccidentDetailScreen() {
                 <Ionicons name="warning" size={12} color="#FFFFFF" />
               </View>
               <View>
-                <Text style={styles.calloutTitle}>Accident</Text>
+                <Text style={styles.calloutTitle}>
+                  {params.type === 'embouteillage' ? 'Embouteillage' : 'Accident'}
+                </Text>
                 <Text style={styles.calloutSub}>Circulation ralentie</Text>
               </View>
             </View>
@@ -137,37 +190,120 @@ export default function NotificationAccidentDetailScreen() {
           </View>
         </ScrollView>
 
-        {/* Dual Action Bottom Bar (Split Pill Button) */}
+        {/* Dual Action Floating Bottom Bar */}
         <View style={styles.dualBarContainer}>
           <View style={styles.splitPillWrapper}>
-            {/* Orange Button: Changer d'itinéraire */}
+            {/* Orange Button: Trouver un itinéraire */}
             <TouchableOpacity
-              style={styles.changeRouteBtn}
-              onPress={() => router.push('/route-detail')}
+              style={styles.findRouteBtn}
+              onPress={handleFindRoute}
               activeOpacity={0.85}
             >
               <View style={styles.whiteIconCircle}>
-                <Ionicons name="location" size={14} color="#F26522" />
+                <Ionicons name="location" size={15} color="#F26522" />
               </View>
-              <Text style={styles.changeRouteText}>Changer d'itinéraire</Text>
+              <Text
+                style={styles.findRouteText}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.75}
+              >
+                Trouver un itinéraire
+              </Text>
             </TouchableOpacity>
 
-            {/* Black Button: Garder mon itinéraire */}
+            {/* Black Button: Suivre cette zone */}
             <TouchableOpacity
-              style={styles.keepRouteBtn}
-              onPress={() => router.push({ pathname: '/navigation-active', params: { destination: 'Orange Digital Center' } })}
+              style={[styles.followZoneBtn, isFollowing && styles.followZoneBtnActive]}
+              onPress={handleToggleFollow}
               activeOpacity={0.85}
             >
-              <Text style={styles.keepRouteText}>Garder mon itinéraire</Text>
+              <Text
+                style={styles.followZoneText}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.75}
+              >
+                {isFollowing ? 'Zone suivie' : 'Suivre cette zone'}
+              </Text>
               <View style={styles.whiteIconCircle}>
-                <Ionicons name="location" size={14} color="#000000" />
+                <Ionicons
+                  name={isFollowing ? 'notifications-sharp' : 'notifications-outline'}
+                  size={15}
+                  color="#000000"
+                />
               </View>
             </TouchableOpacity>
           </View>
         </View>
 
-        {/* Bottom Navigation Bar */}
+        {/* Bottom Navigation Tab Bar */}
         <CustomBottomTabBar activeTab="alerts" />
+
+        {/* Custom Follow Zone Confirmation Modal (Modal 1) */}
+        <Modal
+          transparent
+          visible={followStep === 'confirm'}
+          animationType="fade"
+          onRequestClose={() => setFollowStep('none')}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.followModalCard}>
+              <TouchableOpacity
+                style={styles.modalCloseCornerBtn}
+                onPress={() => setFollowStep('none')}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="close" size={16} color="#FFFFFF" />
+              </TouchableOpacity>
+
+              <Ionicons name="notifications" size={38} color="#F26522" style={styles.modalBellIcon} />
+
+              <Text style={styles.modalConfirmText}>
+                VOUS RECEVREZ DES NOTIFICATIONS CONCERNANT TOUS LES ÉVÉNEMENTS SIGNALÉS DANS CETTE ZONE.
+              </Text>
+
+              <View style={styles.modalButtonsRow}>
+                <TouchableOpacity
+                  style={styles.modalConfirmBtn}
+                  onPress={handleConfirmFollow}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.modalConfirmBtnText}>CONFIRMER</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.modalCancelBtn}
+                  onPress={() => setFollowStep('none')}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.modalCancelBtnText}>ANNULER</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Custom Follow Zone Success Modal (Modal 2) */}
+        <Modal
+          transparent
+          visible={followStep === 'success'}
+          animationType="fade"
+          onRequestClose={() => setFollowStep('none')}
+        >
+          <TouchableOpacity
+            style={styles.modalOverlay}
+            activeOpacity={1}
+            onPress={() => setFollowStep('none')}
+          >
+            <View style={styles.followModalCardSuccess}>
+              <Ionicons name="checkmark-circle" size={42} color="#F26522" />
+              <Text style={styles.modalSuccessText}>
+                ZONE SUIVIE AVEC SUCCÈS
+              </Text>
+            </View>
+          </TouchableOpacity>
+        </Modal>
 
         {/* Side Menu Drawer */}
         <SideMenuModal
@@ -206,9 +342,13 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   headerTitle: {
-    fontSize: 18,
+    flex: 1,
+    fontSize: 17,
     fontWeight: '800',
     color: '#000000',
+    textAlign: 'center',
+    marginHorizontal: 8,
+    fontFamily: 'Montserrat-Bold',
   },
   headerRightActions: {
     flexDirection: 'row',
@@ -240,22 +380,21 @@ const styles = StyleSheet.create({
   },
   mainScrollContent: {
     flexGrow: 1,
-    paddingBottom: 10,
   },
   alertContentContainer: {
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingTop: 16,
-    paddingBottom: 14,
+    paddingBottom: 16,
   },
   accidentIconCircle: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     backgroundColor: '#F26522',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 12,
     shadowColor: '#F26522',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
@@ -263,21 +402,23 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   alertMainTitle: {
-    fontSize: 17,
+    fontSize: 18,
     fontWeight: '900',
     color: '#000000',
     textAlign: 'center',
-    marginBottom: 8,
+    marginBottom: 10,
+    fontFamily: 'Montserrat-Bold',
   },
   alertDescriptionText: {
-    fontSize: 13,
-    color: '#444444',
+    fontSize: 13.5,
+    color: '#333333',
     textAlign: 'center',
-    lineHeight: 19,
+    lineHeight: 20,
     fontWeight: '400',
+    fontFamily: 'Montserrat-Regular',
   },
   mapSection: {
-    height: Math.max(300, height * 0.42),
+    height: Math.max(380, SCREEN_HEIGHT * 0.48),
     width: '100%',
     position: 'relative',
     overflow: 'hidden',
@@ -406,65 +547,185 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   dualBarContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    position: 'absolute',
+    bottom: Platform.OS === 'ios' ? 88 : 78,
+    left: 14,
+    right: 14,
+    zIndex: 110,
   },
   splitPillWrapper: {
     flexDirection: 'row',
-    height: 48,
-    borderRadius: 24,
+    height: 50,
+    borderRadius: 25,
     overflow: 'hidden',
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
+    shadowOpacity: 0.25,
     shadowRadius: 8,
-    elevation: 5,
+    elevation: 8,
+    backgroundColor: '#FFFFFF',
   },
-  changeRouteBtn: {
+  findRouteBtn: {
     flex: 1,
     backgroundColor: '#F26522',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 10,
-    gap: 8,
+    gap: 6,
+    overflow: 'hidden',
   },
-  changeRouteText: {
+  findRouteText: {
     color: '#FFFFFF',
-    fontSize: 13,
+    fontSize: 12.5,
     fontWeight: '800',
+    fontFamily: 'Montserrat-Bold',
+    flexShrink: 1,
   },
-  keepRouteBtn: {
+  followZoneBtn: {
     flex: 1,
     backgroundColor: '#000000',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 10,
-    gap: 8,
+    gap: 6,
+    overflow: 'hidden',
   },
-  keepRouteText: {
+  followZoneBtnActive: {
+    backgroundColor: '#1E293B',
+  },
+  followZoneText: {
     color: '#FFFFFF',
-    fontSize: 13,
+    fontSize: 12.5,
     fontWeight: '800',
+    fontFamily: 'Montserrat-Bold',
+    flexShrink: 1,
   },
   whiteIconCircle: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     backgroundColor: '#FFFFFF',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  bottomNavContainer: {
+  /* Follow Zone Modals */
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  followModalCard: {
+    width: Math.min(SCREEN_WIDTH * 0.88, 340),
+    backgroundColor: '#333333',
+    borderRadius: 20,
+    paddingHorizontal: 24,
+    paddingTop: 26,
+    paddingBottom: 24,
+    alignItems: 'center',
+    position: 'relative',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000000',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.35,
+        shadowRadius: 10,
+      },
+      android: {
+        elevation: 10,
+      },
+    }),
+  },
+  followModalCardSuccess: {
+    width: Math.min(SCREEN_WIDTH * 0.88, 340),
+    backgroundColor: '#333333',
+    borderRadius: 20,
+    paddingHorizontal: 24,
+    paddingTop: 32,
+    paddingBottom: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000000',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.35,
+        shadowRadius: 10,
+      },
+      android: {
+        elevation: 10,
+      },
+    }),
+  },
+  modalCloseCornerBtn: {
+    position: 'absolute',
+    top: 14,
+    left: 14,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#F26522',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalBellIcon: {
+    marginBottom: 16,
+  },
+  modalConfirmText: {
+    color: '#FFFFFF',
+    fontSize: 13.5,
+    fontFamily: 'Montserrat-Bold',
+    fontWeight: '800',
+    textAlign: 'center',
+    lineHeight: 21,
+    marginBottom: 22,
+    letterSpacing: 0.5,
+  },
+  modalButtonsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-around',
-    backgroundColor: '#1E1E1E',
-    paddingVertical: 12,
+    gap: 12,
   },
-  navItem: {
-    padding: 6,
+  modalConfirmBtn: {
+    backgroundColor: '#F26522',
+    borderRadius: 20,
+    paddingHorizontal: 22,
+    paddingVertical: 10,
+  },
+  modalConfirmBtnText: {
+    color: '#FFFFFF',
+    fontSize: 12.5,
+    fontFamily: 'Montserrat-Bold',
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  modalCancelBtn: {
+    backgroundColor: '#F26522',
+    borderRadius: 20,
+    paddingHorizontal: 22,
+    paddingVertical: 10,
+  },
+  modalCancelBtnText: {
+    color: '#FFFFFF',
+    fontSize: 12.5,
+    fontFamily: 'Montserrat-Bold',
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  modalSuccessText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontFamily: 'Montserrat-Bold',
+    fontWeight: '800',
+    textAlign: 'center',
+    lineHeight: 24,
+    marginTop: 16,
+    letterSpacing: 0.5,
   },
 });
+
+
+

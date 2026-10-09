@@ -21,6 +21,7 @@ import { CustomBottomTabBar } from '@/components/custom-bottom-tab-bar';
 import { LocationSuggestionsList } from '@/components/location-suggestions-list';
 import { YangoLocationModal } from '@/components/yango-location-modal';
 import { OsmMapView } from '@/components/osm-map-view';
+import { TripFeedbackModal } from '@/components/trip-feedback-modal';
 import { getRouteBetweenLocations } from '@/services/osrm-service';
 
 const { width, height } = Dimensions.get('window');
@@ -58,8 +59,8 @@ export default function RouteExploreScreen() {
   const params = useLocalSearchParams<{ query?: string; destination?: string }>();
 
   // State for Departure & Arrival (Dynamic from query params or manual entry)
-  const [departure, setDeparture] = useState('Orange Digital Center');
-  const [arrival, setArrival] = useState(params.destination || params.query || 'Cocody Saint-Jean');
+  const [departure, setDeparture] = useState('Abobo Samaké');
+  const [arrival, setArrival] = useState(params.destination || params.query || 'Orange Digital Center');
   const [focusedField, setFocusedField] = useState<'departure' | 'arrival' | null>(null);
   const [osrmCoords, setOsrmCoords] = useState<{ latitude: number; longitude: number }[]>([]);
 
@@ -413,9 +414,6 @@ export default function RouteExploreScreen() {
         {/* Top Header Bar */}
         <View style={styles.topHeader}>
           <View style={styles.logoRow}>
-            <TouchableOpacity onPress={() => router.back()} activeOpacity={0.7} style={styles.backBtnWrapper}>
-              <Ionicons name="arrow-back" size={20} color="#000000" />
-            </TouchableOpacity>
             <Image
               source={require('@/assets/images/sira-logo-official.png')}
               style={styles.logoImage}
@@ -430,7 +428,7 @@ export default function RouteExploreScreen() {
               onPress={() => router.push('/notifications')}
               activeOpacity={0.8}
             >
-              <Ionicons name="notifications" size={22} color="#000000" />
+              <Ionicons name="notifications" size={28} color="#000000" />
               <View style={styles.notificationBadge}>
                 <Text style={styles.badgeText}>5</Text>
               </View>
@@ -442,7 +440,7 @@ export default function RouteExploreScreen() {
               onPress={() => setShowSideMenu(true)}
               activeOpacity={0.8}
             >
-              <Ionicons name="menu" size={24} color="#000000" />
+              <Ionicons name="menu" size={34} color="#000000" />
             </TouchableOpacity>
           </View>
         </View>
@@ -462,7 +460,7 @@ export default function RouteExploreScreen() {
               {/* Dotted Vertical Line */}
               <View style={styles.verticalDottedLine} />
               {/* Arrival Orange Location Pin */}
-              <Ionicons name="location-sharp" size={20} color="#F26522" />
+              <Ionicons name="location-sharp" size={24} color="#F26522" />
             </View>
 
             <View style={styles.routeInputsCol}>
@@ -503,7 +501,7 @@ export default function RouteExploreScreen() {
               onPress={handleSwapLocations}
               activeOpacity={0.7}
             >
-              <Ionicons name="swap-vertical" size={22} color="#F26522" />
+              <Ionicons name="swap-vertical" size={24} color="#F26522" />
             </TouchableOpacity>
           </View>
 
@@ -566,7 +564,7 @@ export default function RouteExploreScreen() {
                 >
                   <Ionicons
                     name={iconName}
-                    size={14}
+                    size={18}
                     color={isActive ? '#FFFFFF' : isEnabled ? '#000000' : '#999999'}
                   />
                   <Text
@@ -978,65 +976,18 @@ export default function RouteExploreScreen() {
           </View>
         )}
 
-        {/* Feedback Rating Popup Modal */}
-        {showFeedback && (
-          <View style={styles.feedbackModalOverlay}>
-            <View style={styles.feedbackCard}>
-              <TouchableOpacity
-                style={styles.feedbackClose}
-                onPress={() => setShowFeedback(false)}
-              >
-                <Ionicons name="close" size={20} color="#666666" />
-              </TouchableOpacity>
-
-              <Image
-                source={require('@/assets/images/sira-character-assistant.png')}
-                style={styles.feedbackAvatar}
-                contentFit="contain"
-              />
-
-              <Text style={styles.feedbackTitle}>
-                Comment s'est passé votre trajet ?
-              </Text>
-              <Text style={styles.feedbackSub}>
-                Votre avis nous aide à améliorer SIRA.
-              </Text>
-
-              <View style={styles.starsRow}>
-                {[1, 2, 3, 4, 5].map((star) => (
-                  <TouchableOpacity
-                    key={star}
-                    onPress={() => setRating(star)}
-                    activeOpacity={0.7}
-                  >
-                    <Ionicons
-                      name={star <= rating ? 'star' : 'star-outline'}
-                      size={28}
-                      color="#F26522"
-                    />
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              <TouchableOpacity
-                style={styles.submitFeedbackBtn}
-                onPress={() => setShowFeedback(false)}
-                activeOpacity={0.85}
-              >
-                <Text style={styles.submitFeedbackText}>Envoyer mon avis</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        )}
+        {/* Trip Rating Feedback Modal */}
+        <TripFeedbackModal
+          visible={showFeedback}
+          onClose={() => setShowFeedback(false)}
+          userName="Diata"
+        />
 
         {/* Side Menu Drawer Modal */}
         <SideMenuModal
           visible={showSideMenu}
           onClose={() => setShowSideMenu(false)}
         />
-
-        {/* WhatsApp-style Bottom Navigation Bar */}
-        <CustomBottomTabBar activeTab="explore" />
       </SafeAreaView>
     </View>
   );
@@ -1076,13 +1027,30 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   logoImage: {
-    width: 120,
-    height: 42,
+    width: 105,
+    height: 38,
+  },
+  headerTaglineRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 2,
+  },
+  taglineBlack: {
+    color: '#111111',
+    fontSize: 10,
+    fontFamily: 'Montserrat-Medium',
+    fontWeight: '500',
+  },
+  taglineOrange: {
+    color: '#F26522',
+    fontSize: 10,
+    fontFamily: 'Montserrat-Medium',
+    fontWeight: '500',
   },
   headerRightActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 14,
   },
   headerIconButton: {
     position: 'relative',
@@ -1093,114 +1061,117 @@ const styles = StyleSheet.create({
     top: 0,
     right: -2,
     backgroundColor: '#F26522',
-    borderRadius: 8,
-    width: 16,
-    height: 16,
+    borderRadius: 9,
+    width: 18,
+    height: 18,
     justifyContent: 'center',
     alignItems: 'center',
   },
   badgeText: {
     color: '#FFFFFF',
-    fontSize: 10,
+    fontSize: 11,
+    fontFamily: 'Montserrat-Bold',
     fontWeight: '800',
   },
   mainScrollView: {
     flex: 1,
   },
   mainScrollContent: {
-    paddingBottom: 140,
+    paddingBottom: 40,
   },
   routeInputCard: {
     marginHorizontal: 16,
-    marginTop: 2,
+    marginTop: 8,
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
     flexDirection: 'row',
     alignItems: 'center',
     shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
-    elevation: 1,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 2,
     borderWidth: 1,
-    borderColor: '#EEEEEE',
+    borderColor: '#EFEFEF',
   },
   routeTimelineCol: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 6,
+    marginRight: 10,
   },
   deptRingDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    borderWidth: 1.5,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    borderWidth: 2,
     borderColor: '#F26522',
     justifyContent: 'center',
     alignItems: 'center',
   },
   deptInnerDot: {
-    width: 3.5,
-    height: 3.5,
-    borderRadius: 1.75,
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
     backgroundColor: '#F26522',
   },
   verticalDottedLine: {
     width: 1,
-    height: 10,
+    height: 14,
     borderWidth: 1,
     borderColor: '#CCCCCC',
     borderStyle: 'dashed',
-    marginVertical: 1,
+    marginVertical: 2,
   },
   routeInputsCol: {
     flex: 1,
   },
   inputItemRow: {
-    paddingVertical: 0,
+    paddingVertical: 1,
   },
   inputLabel: {
-    fontSize: 9.5,
-    color: '#888888',
+    fontSize: 12,
+    color: '#777777',
+    fontFamily: 'Montserrat-Regular',
     fontWeight: '500',
   },
   inputValueInput: {
-    fontSize: 11.5,
+    fontSize: 15,
     color: '#000000',
+    fontFamily: 'Montserrat-Bold',
     fontWeight: '700',
-    marginTop: -3,
-    padding: 0,
+    marginTop: 1,
+    paddingVertical: 2,
   },
   cardInputDivider: {
     height: 1,
-    backgroundColor: '#EEEEEE',
-    marginVertical: 1.5,
+    backgroundColor: '#F0F0F0',
+    marginVertical: 5,
   },
   swapButton: {
-    padding: 4,
-    marginLeft: 4,
+    padding: 8,
+    marginLeft: 8,
     backgroundColor: '#FFF4EE',
-    borderRadius: 12,
+    borderRadius: 14,
   },
   filtersScrollView: {
-    marginTop: 4,
-    maxHeight: 34,
+    marginTop: 8,
+    maxHeight: 44,
   },
   filtersContentContainer: {
     paddingHorizontal: 16,
-    gap: 6,
+    gap: 8,
     alignItems: 'center',
   },
   filterChip: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#EFEFEF',
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 16,
-    gap: 5,
+    paddingHorizontal: 15,
+    paddingVertical: 7,
+    borderRadius: 20,
+    gap: 6,
   },
   filterChipActive: {
     backgroundColor: '#F26522',
@@ -1210,7 +1181,8 @@ const styles = StyleSheet.create({
     opacity: 0.45,
   },
   filterChipText: {
-    fontSize: 11,
+    fontSize: 13.5,
+    fontFamily: 'Montserrat-Bold',
     fontWeight: '700',
     color: '#333333',
   },
@@ -1264,8 +1236,8 @@ const styles = StyleSheet.create({
   mapContainer: {
     marginHorizontal: 16,
     marginTop: 10,
-    height: 360,
-    borderRadius: 20,
+    height: 380,
+    borderRadius: 16,
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: '#E2E8F0',

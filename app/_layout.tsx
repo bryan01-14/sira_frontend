@@ -1,13 +1,64 @@
-import { Stack } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import 'react-native-reanimated';
 import { ThemeProvider } from '@/context/theme-context';
+import {
+  Montserrat_400Regular,
+  Montserrat_500Medium,
+  Montserrat_600SemiBold,
+  Montserrat_700Bold,
+  Montserrat_800ExtraBold,
+  Montserrat_900Black,
+  useFonts,
+} from '@expo-google-fonts/montserrat';
+import { Stack } from 'expo-router';
+import * as SplashScreen from 'expo-splash-screen';
+import { StatusBar } from 'expo-status-bar';
+import { useEffect } from 'react';
+import { Text as RNText, TextInput as RNTextInput } from 'react-native';
+import 'react-native-reanimated';
+
+SplashScreen.preventAutoHideAsync();
+
+// Set global default font family for React Native Text & TextInput
+if ((RNText as any).defaultProps == null) {
+  (RNText as any).defaultProps = {};
+}
+(RNText as any).defaultProps.style = [{ fontFamily: 'Montserrat-Regular' }, (RNText as any).defaultProps.style];
+
+if ((RNTextInput as any).defaultProps == null) {
+  (RNTextInput as any).defaultProps = {};
+}
+(RNTextInput as any).defaultProps.style = [{ fontFamily: 'Montserrat-Regular' }, (RNTextInput as any).defaultProps.style];
 
 export const unstable_settings = {
   anchor: '(tabs)',
 };
 
 export default function RootLayout() {
+  const [loaded, error] = useFonts({
+    Montserrat: Montserrat_400Regular,
+    'Montserrat-Regular': Montserrat_400Regular,
+    'Montserrat-Medium': Montserrat_500Medium,
+    'Montserrat-SemiBold': Montserrat_600SemiBold,
+    'Montserrat-Bold': Montserrat_700Bold,
+    'Montserrat-ExtraBold': Montserrat_800ExtraBold,
+    'Montserrat-Black': Montserrat_900Black,
+    Montserrat_400Regular,
+    Montserrat_500Medium,
+    Montserrat_600SemiBold,
+    Montserrat_700Bold,
+    Montserrat_800ExtraBold,
+    Montserrat_900Black,
+  });
+
+  useEffect(() => {
+    if (loaded || error) {
+      SplashScreen.hideAsync();
+    }
+  }, [loaded, error]);
+
+  if (!loaded && !error) {
+    return null;
+  }
+
   return (
     <ThemeProvider>
       <Stack

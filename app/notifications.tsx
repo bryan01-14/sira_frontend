@@ -138,7 +138,7 @@ export default function NotificationsScreen() {
             activeOpacity={0.7}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            <Ionicons name="arrow-back" size={24} color="#000000" />
+            <Ionicons name="arrow-back" size={28} color="#000000" />
           </TouchableOpacity>
 
           <Text style={styles.headerTitle}>Notifications</Text>
@@ -149,7 +149,7 @@ export default function NotificationsScreen() {
             activeOpacity={0.7}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            <Ionicons name="search" size={22} color="#000000" />
+            <Ionicons name="search" size={28} color="#000000" />
           </TouchableOpacity>
         </View>
 
@@ -197,7 +197,18 @@ export default function NotificationsScreen() {
                 <TouchableOpacity
                   key={item.id}
                   style={styles.notificationCard}
-                  onPress={() => router.push('/notification-accident-detail')}
+                  onPress={() =>
+                    router.push({
+                      pathname: '/notification-accident-detail',
+                      params: {
+                        id: item.id,
+                        type: item.type,
+                        title: item.title,
+                        message: item.message,
+                        iconName: item.iconName,
+                      },
+                    })
+                  }
                   activeOpacity={0.85}
                 >
                   {/* Left Orange Circle Icon */}
@@ -222,7 +233,18 @@ export default function NotificationsScreen() {
                   {/* Right Action Circle Button */}
                   <TouchableOpacity
                     style={styles.actionCircle}
-                    onPress={() => router.push('/notification-accident-detail')}
+                    onPress={() =>
+                      router.push({
+                        pathname: '/notification-accident-detail',
+                        params: {
+                          id: item.id,
+                          type: item.type,
+                          title: item.title,
+                          message: item.message,
+                          iconName: item.iconName,
+                        },
+                      })
+                    }
                     activeOpacity={0.8}
                   >
                     <Ionicons
@@ -238,8 +260,8 @@ export default function NotificationsScreen() {
         </ScrollView>
       </View>
 
-      {/* Bottom Navigation Bar */}
-      <CustomBottomTabBar activeTab="alerts" />
+      {/* Bottom Navigation Bar (activeTab='none' so no tab icon is selected) */}
+      <CustomBottomTabBar activeTab="none" />
     </SafeAreaView>
   );
 }

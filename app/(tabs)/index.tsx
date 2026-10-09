@@ -70,8 +70,12 @@ export default function HomeScreen() {
     <View style={styles.container}>
       <StatusBar style="dark" />
 
-      {/* Real OpenStreetMap Interactive Canvas */}
-      <OsmMapView style={styles.backgroundImage} />
+      {/* Static Map Background Image */}
+      <Image
+        source={require('@/assets/images/signup-map-bg.png')}
+        style={styles.backgroundImage}
+        contentFit="cover"
+      />
 
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         {/* Top Header Bar with Circular Black Back Button */}
@@ -247,61 +251,67 @@ const styles = StyleSheet.create({
   },
   speechBubble: {
     position: 'absolute',
-    top: CHARACTER_TOP - 110,
-    left: 22,
-    backgroundColor: 'rgba(255, 255, 255, 0.78)',
+    top: CHARACTER_TOP - 118,
+    left: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.68)',
     paddingHorizontal: 20,
     paddingVertical: 14,
-    borderRadius: 22,
-    borderBottomLeftRadius: 4,
+    borderRadius: 24,
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.18,
+    shadowOpacity: 0.10,
     shadowRadius: 10,
-    elevation: 6,
+    elevation: 4,
     zIndex: 20,
-    maxWidth: SCREEN_WIDTH * 0.65,
+    width: 250,
+    alignItems: 'center',
   },
   speechGreeting: {
     color: '#121212',
-    fontSize: 16,
-    fontWeight: '400',
+    fontSize: 18,
+    fontFamily: 'Montserrat-Regular',
+    textAlign: 'center',
     marginBottom: 2,
   },
   speechGreetingBold: {
-    fontWeight: '800',
+    fontFamily: 'Montserrat-Bold',
+    fontWeight: '700',
     color: '#000000',
   },
   speechMain: {
-    color: '#333333',
-    fontSize: 14,
-    fontWeight: '500',
-    lineHeight: 19,
+    color: '#111111',
+    fontSize: 15,
+    fontFamily: 'Montserrat-Regular',
+    textAlign: 'center',
+    lineHeight: 21,
   },
   siraBold: {
     color: '#000000',
-    fontWeight: '900',
+    fontFamily: 'Montserrat-Bold',
+    fontWeight: '800',
   },
   speechSub: {
-    color: '#333333',
-    fontSize: 14,
+    color: '#111111',
+    fontSize: 15,
+    fontFamily: 'Montserrat-Bold',
     fontWeight: '700',
-    lineHeight: 19,
+    textAlign: 'center',
+    lineHeight: 21,
   },
   speechBubbleArrow: {
     position: 'absolute',
-    bottom: -8,
-    left: 24,
+    bottom: -10,
+    right: 50,
     width: 0,
     height: 0,
-    borderLeftWidth: 8,
-    borderRightWidth: 8,
-    borderTopWidth: 9,
+    borderLeftWidth: 9,
+    borderRightWidth: 9,
+    borderTopWidth: 10,
     borderStyle: 'solid',
     backgroundColor: 'transparent',
     borderLeftColor: 'transparent',
     borderRightColor: 'transparent',
-    borderTopColor: 'rgba(255, 255, 255, 0.78)',
+    borderTopColor: 'rgba(255, 255, 255, 0.68)',
   },
 
   /* 3D Character Container - Designer Specs (324x486 at Top: 414px, Left: 39px) */
