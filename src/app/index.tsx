@@ -1,98 +1,161 @@
-import * as Device from 'expo-device';
-import { Platform, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import React, { useEffect, useRef } from 'react';
+import {
+  Animated,
+  Dimensions,
+  Easing,
+  Image,
+  Platform,
+  Pressable,
+  StyleSheet,
+} from 'react-native';
+import { StatusBar } from 'expo-status-bar';
+import { router } from 'expo-router';
 
-import { AnimatedIcon } from '@/components/animated-icon';
-import { HintRow } from '@/components/hint-row';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { WebBadge } from '@/components/web-badge';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const LOGO_WIDTH = Math.min(Math.round(SCREEN_WIDTH * 0.52), 215);
+const LOGO_HEIGHT = Math.round(LOGO_WIDTH * (185 / 180));
+const useNative = Platform.OS !== 'web';
 
-function getDevMenuHint() {
-  if (Platform.OS === 'web') {
-    return <ThemedText type="small">use browser devtools</ThemedText>;
-  }
-  if (Device.isDevice) {
-    return (
-      <ThemedText type="small">
-        shake device or press <ThemedText type="code">m</ThemedText> in terminal
-      </ThemedText>
-    );
-  }
-  const shortcut = Platform.OS === 'android' ? 'cmd+m (or ctrl+m)' : 'cmd+d';
+export default function SplashScreen() {
+  const logoOpacity = useRef(new Animated.Value(0)).current;
+  const logoScale = useRef(new Animated.Value(0.45)).current;
+  const logoTranslateY = useRef(new Animated.Value(32)).current;
+  const logoRotate = useRef(new Animated.Value(-1)).current;
+  const logoBreath = useRef(new Animated.Value(1)).current;
+
+  const navigatedRef = useRef(false);
+
+  const navigateToNext = () => {
+    if (navigatedRef.current) return;
+    navigatedRef.current = true;
+    router.replace('/welcome');
+  };
+
+  useEffect(() => {
+    // 1. Dynamic elastic entrance (rise + bounce + straighten)
+    Animated.parallel([
+      Animated.timing(logoOpacity, {
+        toValue: 1,
+        duration: 500,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: useNative,
+      }),
+      Animated.spring(logoScale, {
+        toValue: 1,
+        tension: 55,
+        friction: 5,
+        useNativeDriver: useNative,
+      }),
+      Animated.spring(logoTranslateY, {
+        toValue: 0,
+        tension: 50,
+        friction: 6,
+        useNativeDriver: useNative,
+      }),
+      Animated.spring(logoRotate, {
+        toValue: 0,
+        tension: 45,
+        friction: 6,
+        useNativeDriver: useNative,
+      }),
+    ]).start(() => {
+      // 2. Smooth breathing pulse
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(logoBreath, {
+            toValue: 1.06,
+            duration: 750,
+            easing: Easing.inOut(Easing.sin),
+            useNativeDriver: useNative,
+          }),
+          Animated.timing(logoBreath, {
+            toValue: 1,
+            duration: 750,
+            easing: Easing.inOut(Easing.sin),
+            useNativeDriver: useNative,
+          }),
+        ])
+      ).start();
+    });
+
+    // 3. Smooth exit animation then navigate to register
+    const exitTimer = setTimeout(() => {
+      if (navigatedRef.current) return;
+      Animated.parallel([
+        Animated.timing(logoOpacity, {
+          toValue: 0,
+          duration: 300,
+          easing: Easing.in(Easing.cubic),
+          useNativeDriver: useNative,
+        }),
+        Animated.timing(logoScale, {
+          toValue: 1.18,
+          duration: 300,
+          easing: Easing.in(Easing.cubic),
+          useNativeDriver: useNative,
+        }),
+      ]).start(() => {
+        navigateToNext();
+      });
+    }, 2600);
+
+    return () => clearTimeout(exitTimer);
+  }, [logoBreath, logoOpacity, logoRotate, logoScale, logoTranslateY]);
+
+  const rotateInterpolate = logoRotate.interpolate({
+    inputRange: [-1, 0],
+    outputRange: ['-6deg', '0deg'],
+  });
+
   return (
-    <ThemedText type="small">
-      press <ThemedText type="code">{shortcut}</ThemedText>
-    </ThemedText>
-  );
-}
+    <Pressable
+      style={styles.container}
+      onPress={navigateToNext}
+      accessibilityRole="button"
+      accessibilityLabel="Passer vers la page d'accueil"
+    >
+      <StatusBar style="light" />
 
-export default function HomeScreen() {
-  return (
-    <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
-        <ThemedView style={styles.heroSection}>
-          <AnimatedIcon />
-          <ThemedText type="title" style={styles.title}>
-            Welcome to&nbsp;Expo
-          </ThemedText>
-        </ThemedView>
-
-        <ThemedText type="code" style={styles.code}>
-          get started
-        </ThemedText>
-
-        <ThemedView type="backgroundElement" style={styles.stepContainer}>
-          <HintRow
-            title="Try editing"
-            hint={<ThemedText type="code">src/app/index.tsx</ThemedText>}
-          />
-          <HintRow title="Dev tools" hint={getDevMenuHint()} />
-          <HintRow
-            title="Fresh start"
-            hint={<ThemedText type="code">npm run reset-project</ThemedText>}
-          />
-        </ThemedView>
-
-        {Platform.OS === 'web' && <WebBadge />}
-      </SafeAreaView>
-    </ThemedView>
+      <Animated.View
+        style={[
+          styles.logoContainer,
+          {
+            opacity: logoOpacity,
+            transform: [
+              { translateY: logoTranslateY },
+              { rotate: rotateInterpolate },
+              { scale: logoScale },
+              { scale: logoBreath },
+            ],
+          },
+        ]}
+      >
+        <Image
+          source={require('../../assets/images/sira-logo-dark.png')}
+          style={styles.logoImage}
+          resizeMode="contain"
+          accessibilityLabel="Logo Sira Chauffeur"
+        />
+      </Animated.View>
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#000000',
     justifyContent: 'center',
-    flexDirection: 'row',
-  },
-  safeArea: {
-    flex: 1,
-    paddingHorizontal: Spacing.four,
     alignItems: 'center',
-    gap: Spacing.three,
-    paddingBottom: BottomTabInset + Spacing.three,
-    maxWidth: MaxContentWidth,
   },
-  heroSection: {
-    alignItems: 'center',
+  logoContainer: {
+    width: LOGO_WIDTH,
+    height: LOGO_HEIGHT,
     justifyContent: 'center',
-    flex: 1,
-    paddingHorizontal: Spacing.four,
-    gap: Spacing.four,
+    alignItems: 'center',
   },
-  title: {
-    textAlign: 'center',
-  },
-  code: {
-    textTransform: 'uppercase',
-  },
-  stepContainer: {
-    gap: Spacing.three,
-    alignSelf: 'stretch',
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.four,
-    borderRadius: Spacing.four,
+  logoImage: {
+    width: '100%',
+    height: '100%',
   },
 });
