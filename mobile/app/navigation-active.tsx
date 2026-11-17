@@ -8,24 +8,26 @@ import {
   Dimensions,
   Platform,
   StyleSheet,
-  Text,
-  TextInput,
   TouchableOpacity,
   useWindowDimensions,
   View,
 } from 'react-native';
+import { Text, TextInput } from '@/components/sira-text';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { OsmMapView } from '@/components/osm-map-view';
+import { TripRatingModal } from '@/components/trip-rating-modal';
 import { notify } from '@/lib/notify';
 import { journeyStore, useJourneyStore } from '@/lib/journey-store';
 import { fetchJourneys, journeyImpact, reportFare, voteReport, type ApiJourney, type LegMode, type ReportImpact } from '@/lib/sira-api';
 import { formatClock, formatDistance, formatDuration, formatPrice, isVehicle, journeyPath, journeyTitle, stepDescription, stepTitle, timeline } from '@/lib/journey-format';
-import { clientId, upsertReport, useLiveReports } from '@/lib/reports';
+import { upsertReport, useLiveReports } from '@/lib/reports';
 import { locateUser, refreshCurrentPlace } from '@/lib/places';
+import { usageAllowed } from '@/lib/usage';
 import { goBack, goHome } from '@/lib/navigation';
 import { currentToken } from '@/lib/session';
+import { arrivalPhrase, placeForTitle } from '@/lib/saved-places';
 import { alightSoonSpeech, arrivalSpeech, fareQuestion, gpsEvent, gpsHint, minutes, spokenJourney, startSpeech, stepSpeech } from '@/lib/guidance';
-import { cycleVoiceMode, say, stopSpeaking, useVoiceMode, VOICE_MODE_LABELS, type VoiceMode } from '@/lib/voice';
+import { cycleVoiceMode, say, stopSpeaking, useVoiceMode, VOICE_MODE_ICONS, VOICE_MODE_LABELS } from '@/lib/voice';
 import { useSpokenQuestion } from '@/lib/use-spoken-question';
 
 const { height } = Dimensions.get('window');
@@ -37,7 +39,6 @@ const MODE_COLORS: Record<LegMode, string> = {
   walk: '#10B981', wait: '#64748B', transfer: '#7C3AED', sotra: '#F26522', gbaka: '#F26522', woro: '#1E6091', taxi: '#1E6091', boat: '#0284C7',
 };
 // Speaker button, as in Google Maps: all spoken → alerts only → muted.
-const VOICE_ICONS: Record<VoiceMode, keyof typeof Ionicons.glyphMap> = { on: 'volume-high', alerts: 'notifications', off: 'volume-mute' };
 
 export default function NavigationActiveScreen() {
   const router = useRouter();
@@ -53,6 +54,8 @@ export default function NavigationActiveScreen() {
   const [arrived, setArrived] = useState(false);
   const [fare, setFare] = useState<{ state: 'ask' | 'sent'; typed: string }>({ state: 'ask', typed: '' });
   const [showExitConfirm, setShowExitConfirm] = useState(false);
+  // « Comment s'est passé ton trajet ? », asked when the traveller ends an arrived trip.
+  const [showRating, setShowRating] = useState(false);
   // Small phones: the top card grows (title on two lines), so what sits under it
   // follows its real bottom; the bottom card keeps only the icon of « Quitter ».
   const [hudBottom, setHudBottom] = useState(0);
@@ -133,10 +136,13 @@ export default function NavigationActiveScreen() {
   const answerStillThere = async (reportId: string, kind: 'confirm' | 'contest') => {
     question.cancel();
     setAnswered((ids) => [...ids, reportId]);
-    try { upsertReport(await voteReport(reportId, kind, clientId())); } catch { /* déjà voté ou hors ligne */ }
+    try { upsertReport(await voteReport(reportId, kind)); } catch { /* déjà voté, hors ligne ou pas connecté */ }
   };
 
   const destinationName = search?.arrival.name ?? 'ta destination';
+  // « Te voilà à la maison ! » when the trip goes to one of the traveller's places.
+  const savedArrival = placeForTitle(search?.arrival.name);
+  const arrivalWhere = savedArrival ? arrivalPhrase(savedArrival) : `à ${destinationName}`;
   // Community price asked on arrival (lines with a known id, not taxis).
   const fareLeg = journey?.legs.find((leg) => isVehicle(leg) && leg.mode !== 'taxi' && leg.line_id) ?? null;
   const canShareFare = Boolean(fareLeg && currentToken());
@@ -151,6 +157,14 @@ export default function NavigationActiveScreen() {
     } catch (error) {
       notify('Envoi impossible', error instanceof Error ? error.message : 'Réessaie dans un instant.');
     }
+  };
+
+  // Arrived: the trip is over, the home map is next (as in Google Maps and Waze).
+  const finishTrip = () => {
+    setShowRating(false);
+    journeyStore.finish();
+    void refreshCurrentPlace();
+    goHome(router);
   };
 
   const nextStep = () => {
@@ -206,7 +220,7 @@ export default function NavigationActiveScreen() {
     if (!alternative || alerted.current.has(alternative.id)) return;
     alerted.current.add(alternative.id);
     void question.ask(
-      `J'ai trouvé un détour : ${spokenJourney(alternative)}, environ ${minutes(alternative.duration)}. Dites oui pour le prendre.`,
+      `J'ai trouvé un détour : ${spokenJourney(alternative)}, environ ${minutes(alternative.duration)}. Dis oui pour le prendre.`,
       `adopt:${alternative.id}`,
     ).then((answer) => {
       if (answer?.answer === 'yes') adoptAlternative();
@@ -237,6 +251,8 @@ export default function NavigationActiveScreen() {
     let stopped = false;
     (async () => {
       try {
+        // Position turned off in SIRA: guidance by touch only, the phone's GPS is left alone.
+        if (!(await usageAllowed('location')) || stopped) return;
         const permission = await Location.requestForegroundPermissionsAsync();
         if (permission.status !== 'granted' || stopped) return;
         subscription = await Location.watchPositionAsync(
@@ -274,7 +290,7 @@ export default function NavigationActiveScreen() {
     if (!arrived || arrivalSaid.current) return;
     arrivalSaid.current = true;
     void (async () => {
-      await say(arrivalSpeech(destinationName), 'guidance');
+      await say(arrivalSpeech(arrivalWhere), 'guidance');
       if (!fareLeg || !canShareFare) return;
       const answer = await question.ask(fareQuestion(fareLeg), 'fare');
       if (answer?.amount) void sendFare(answer.amount);
@@ -372,7 +388,7 @@ export default function NavigationActiveScreen() {
               accessibilityRole="button"
               accessibilityLabel={`Voix : ${VOICE_MODE_LABELS[voiceMode]}. Touche pour changer.`}
             >
-              <Ionicons name={VOICE_ICONS[voiceMode]} size={22} color={voiceMode === 'off' ? '#94A3B8' : '#F26522'} />
+              <Ionicons name={VOICE_MODE_ICONS[voiceMode]} size={22} color={voiceMode === 'off' ? '#94A3B8' : '#F26522'} />
             </TouchableOpacity>
           </View>
 
@@ -464,7 +480,7 @@ export default function NavigationActiveScreen() {
           <View style={styles.bottomDashboardCard}>
             <View style={styles.arrivalHeader}>
               <Ionicons name="flag" size={24} color="#10B981" />
-              <Text style={styles.arrivalTitle}>Te voilà à {destinationName} !</Text>
+              <Text style={styles.arrivalTitle}>Te voilà {arrivalWhere} !</Text>
             </View>
             {canShareFare && fareLeg && fare.state === 'ask' && (
               <>
@@ -496,11 +512,10 @@ export default function NavigationActiveScreen() {
             <TouchableOpacity
               style={[styles.cancelExitBtn, styles.arrivalDone]}
               onPress={() => {
-                // Arrived: the trip is over, the home map is next (as in Google Maps and Waze).
                 question.cancel();
-                journeyStore.finish();
-                void refreshCurrentPlace();
-                goHome(router);
+                // The note goes to the traveller's account: without one, the trip just ends.
+                if (currentToken()) setShowRating(true);
+                else finishTrip();
               }}
               activeOpacity={0.85}
             >
@@ -601,6 +616,8 @@ export default function NavigationActiveScreen() {
           </View>
         )}
       </SafeAreaView>
+
+      <TripRatingModal visible={showRating} legs={journey.legs} onClose={finishTrip} />
     </View>
   );
 }

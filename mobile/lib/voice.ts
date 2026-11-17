@@ -1,12 +1,16 @@
 // SIRA's voice, shared by every screen (greeting, assistant, guidance, alerts).
-// Three settings as in Google Maps: all spoken, alerts only, or muted.
-// SIRA speaks with its own Piper voice (services/voice), else the phone's voice.
+// Three settings as in Google Maps: all spoken, alerts only, or muted. Muted until the
+// traveller turns it on (Paramètres → Voix de SIRA, or the speaker button): opening SIRA
+// never starts talking by itself.
+// SIRA speaks with ONE voice only: its own Piper voice « pierre » (services/voice), a man
+// like the character. No other voice, not even the phone's: without SIRA's voice (offline,
+// service stopped) the sentence stays on screen, unspoken.
 import { useEffect, useSyncExternalStore } from 'react';
 import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import { createAudioPlayer, type AudioPlayer } from 'expo-audio';
 import { File, Paths } from 'expo-file-system';
-import * as Speech from 'expo-speech';
+import type { Ionicons } from '@expo/vector-icons';
 import { apiBaseUrl } from '@/lib/sira-api';
 
 export type VoiceMode = 'on' | 'alerts' | 'off';
@@ -19,32 +23,51 @@ export type SpeechKind = 'guidance' | 'alert' | 'answer' | 'greeting';
 const KEY = 'sira-voice-mode';
 const MODES: VoiceMode[] = ['on', 'alerts', 'off'];
 export const VOICE_MODE_LABELS: Record<VoiceMode, string> = { on: 'Voix activée', alerts: 'Alertes seulement', off: 'Voix coupée' };
+// One icon per setting, the same on every screen (home, trip, profile, settings).
+export const VOICE_MODE_ICONS: Record<VoiceMode, keyof typeof Ionicons.glyphMap> = { on: 'volume-high', alerts: 'notifications', off: 'volume-mute' };
+export const VOICE_MODE_DETAILS: Record<VoiceMode, string> = {
+  on: 'SIRA te salue, te guide pendant le trajet et répond à voix haute.',
+  alerts: 'SIRA parle seulement pour les alertes du trajet et pour répondre à tes questions.',
+  off: 'SIRA ne parle pas : tout reste écrit à l’écran.',
+};
 
-let mode: VoiceMode = 'on';
+// Until the traveller chooses, SIRA stays silent.
+export const DEFAULT_VOICE_MODE: VoiceMode = 'off';
+let mode: VoiceMode = DEFAULT_VOICE_MODE;
 const listeners = new Set<() => void>();
+
+const readSetting = (key: string) => (Platform.OS === 'web' ? Promise.resolve(window.localStorage.getItem(key)) : SecureStore.getItemAsync(key));
+function writeSetting(key: string, value: string) {
+  try {
+    if (Platform.OS === 'web') window.localStorage.setItem(key, value);
+    else void SecureStore.setItemAsync(key, value).catch(() => {});
+  } catch { /* stockage indisponible */ }
+}
 
 export async function loadVoiceMode() {
   try {
-    const saved = Platform.OS === 'web' ? window.localStorage.getItem(KEY) : await SecureStore.getItemAsync(KEY);
+    const saved = await readSetting(KEY);
     if (saved && (MODES as string[]).includes(saved)) { mode = saved as VoiceMode; listeners.forEach((l) => l()); }
-  } catch { /* réglage illisible : voix activée */ }
+  } catch { /* réglage illisible : voix coupée */ }
 }
 
 export function setVoiceMode(next: VoiceMode) {
   mode = next;
   listeners.forEach((l) => l());
-  try {
-    if (Platform.OS === 'web') window.localStorage.setItem(KEY, next);
-    else void SecureStore.setItemAsync(KEY, next).catch(() => {});
-  } catch { /* stockage indisponible */ }
+  writeSetting(KEY, next);
   if (next === 'off') stopSpeaking();
 }
 
-// Speaker button: on → alerts only → off → on, and SIRA says the new setting.
-export function cycleVoiceMode() {
-  const next = MODES[(MODES.indexOf(mode) + 1) % MODES.length];
+// The traveller picked a setting: SIRA says it, so they hear what they turned on.
+export function chooseVoiceMode(next: VoiceMode) {
   setVoiceMode(next);
   if (next !== 'off') void say(next === 'on' ? 'Voix activée.' : 'Je te préviens seulement des alertes.', 'alert');
+}
+
+// Speaker button: on → alerts only → off → on.
+export function cycleVoiceMode() {
+  const next = MODES[(MODES.indexOf(mode) + 1) % MODES.length];
+  chooseVoiceMode(next);
   return next;
 }
 
@@ -95,23 +118,27 @@ export function stopSpeaking() {
   interrupted = sentence;
   player?.remove();
   player = null;
-  Speech.stop().catch(() => {});
   finished();
 }
 
 // Sentences written by the app (greeting, steps, prompts) come back often: SIRA's
 // voice for each one is kept (on the phone: in the cache folder, even after a
 // restart; on the web: for the session), so it plays at once the next time.
-const CACHE_VERSION = 'v2';
+const CACHE_VERSION = 'v5';
 const WEB_CACHE_MAX = 40;
 const webCache = new Map<string, string>();
-const TTS_TIMEOUT_MS = 6000;
+// Waited for, since there is no other voice: a sentence arrives late rather than in another voice.
+const TTS_TIMEOUT_MS = 10000;
 
 const textKey = (text: string) => {
   let hash = 5381;
   for (let index = 0; index < text.length; index += 1) hash = ((hash << 5) + hash + text.charCodeAt(index)) | 0;
   return `${CACHE_VERSION}-${(hash >>> 0).toString(36)}-${text.length}`;
 };
+
+// The server sends MP3 (about 9 times lighter than WAV, so it arrives in time on a
+// mobile connection and SIRA keeps its own voice), or WAV when it could not encode it.
+const extensionFor = (mime: string | null | undefined) => (mime?.includes('wav') ? 'wav' : 'mp3');
 
 async function fetchVoice(text: string): Promise<Response | null> {
   const controller = new AbortController();
@@ -128,9 +155,19 @@ async function fetchVoice(text: string): Promise<Response | null> {
   }
 }
 
-// SIRA's own voice for a sentence written by the app, from the cache when possible.
-async function cachedVoice(text: string): Promise<string | null> {
+// SIRA's own voice for a sentence, from the cache when possible. The same sentence
+// asked twice at once (prepared, then said) is fetched only once.
+const inflight = new Map<string, Promise<string | null>>();
+function cachedVoice(text: string): Promise<string | null> {
   const key = textKey(text);
+  const known = inflight.get(key);
+  if (known) return known;
+  const loading = loadVoice(text, key).finally(() => inflight.delete(key));
+  inflight.set(key, loading);
+  return loading;
+}
+
+async function loadVoice(text: string, key: string): Promise<string | null> {
   if (Platform.OS === 'web') {
     const known = webCache.get(key);
     if (known) return known;
@@ -145,19 +182,20 @@ async function cachedVoice(text: string): Promise<string | null> {
     }
     return url;
   }
-  const file = new File(Paths.cache, `sira-voix-${key}.wav`);
-  if (file.exists) return file.uri;
+  const known = ['mp3', 'wav'].map((ext) => new File(Paths.cache, `sira-voix-${key}.${ext}`)).find((file) => file.exists);
+  if (known) return known.uri;
   const response = await fetchVoice(text);
   if (!response) return null;
+  const file = new File(Paths.cache, `sira-voix-${key}.${extensionFor(response.headers.get('content-type'))}`);
   file.write(new Uint8Array(await response.arrayBuffer()));
   return file.uri;
 }
 
-async function wavUri(base64: string | null, text: string): Promise<string | null> {
+async function audioUri(base64: string | null, mime: string, text: string): Promise<string | null> {
   if (!base64) return cachedVoice(text);
   // Answer of the assistant: its audio came with the answer (no second request).
-  if (Platform.OS === 'web') return `data:audio/wav;base64,${base64}`;
-  const file = new File(Paths.cache, 'sira-voix-reponse.wav');
+  if (Platform.OS === 'web') return `data:${mime};base64,${base64}`;
+  const file = new File(Paths.cache, `sira-voix-reponse.${extensionFor(mime)}`);
   file.write(base64, { encoding: 'base64' });
   return file.uri;
 }
@@ -170,7 +208,7 @@ export async function prepareSpeech(texts: string[]) {
 
 // Browsers keep a page silent until it is touched once: the sentence waits for
 // that first touch instead of being lost (on a phone, it is spoken right away).
-type Pending = { text: string; kind: SpeechKind; audioBase64: string | null };
+type Pending = { text: string; kind: SpeechKind; audioBase64: string | null; audioMime: string };
 let pending: Pending | null = null;
 const needsTouch = () => {
   if (Platform.OS !== 'web' || typeof navigator === 'undefined') return false;
@@ -184,7 +222,7 @@ function sayAfterFirstTouch(next: Pending) {
   window.addEventListener('pointerdown', () => {
     const waiting = pending;
     pending = null;
-    if (waiting) void say(waiting.text, waiting.kind, waiting.audioBase64);
+    if (waiting) void say(waiting.text, waiting.kind, waiting.audioBase64, waiting.audioMime);
   }, { once: true });
 }
 
@@ -192,16 +230,18 @@ function sayAfterFirstTouch(next: Pending) {
 // so a conversation can listen again right after a question: true when it was
 // said to the end, false when it was not said or was cut (so a series of
 // sentences stops with it).
-export async function say(text: string, kind: SpeechKind = 'guidance', audioBase64: string | null = null): Promise<boolean> {
+export async function say(text: string, kind: SpeechKind = 'guidance', audioBase64: string | null = null,
+  audioMime = 'audio/mpeg'): Promise<boolean> {
   if (!text || !allowed(kind)) return false;
-  if (needsTouch()) { sayAfterFirstTouch({ text, kind, audioBase64 }); return false; }
+  if (needsTouch()) { sayAfterFirstTouch({ text, kind, audioBase64, audioMime }); return false; }
   stopSpeaking();
   const mine = ++sentence;
   const done = new Promise<void>((resolve) => { finish = resolve; });
-  const uri = await wavUri(audioBase64, text);
-  if (mine !== sentence) return false;  // a newer sentence took over
+  const uri = await audioUri(audioBase64, audioMime, text);
+  if (mine !== sentence || interrupted === mine) return false;  // a newer sentence took over, or « Stop »
+  // SIRA's voice unavailable (offline, service stopped): the sentence stays on screen, unspoken.
+  if (!uri) { finished(); return false; }
   try {
-    if (!uri) throw new Error('Piper indisponible');
     const current = createAudioPlayer({ uri });
     player = current;
     const subscription = (current as unknown as PlayerEvents).addListener('playbackStatusUpdate', (status) => {
@@ -212,9 +252,9 @@ export async function say(text: string, kind: SpeechKind = 'guidance', audioBase
     });
     current.play();
   } catch {
-    // A sentence stopped for a newer one must not end the newer one.
-    const end = () => { if (mine === sentence) finished(); };
-    Speech.speak(text, { language: 'fr-FR', onDone: end, onStopped: end, onError: end });
+    // Audio could not be played: no other voice takes over.
+    finished();
+    return false;
   }
   setSpeaking(true);
   // Never wait forever (autoplay blocked, audio route lost…).
@@ -222,6 +262,19 @@ export async function say(text: string, kind: SpeechKind = 'guidance', audioBase
   await Promise.race([done, timeout]);
   if (mine === sentence) setSpeaking(false);
   return mine === sentence && interrupted !== mine;
+}
+
+// A reply of several sentences, said one after the other. The first one's voice came
+// with the answer; the next ones are asked for while it plays (the voice service is
+// already preparing them), so SIRA starts talking without waiting for the whole reply.
+export async function sayParts(parts: string[], kind: SpeechKind = 'answer', firstAudioBase64: string | null = null,
+  audioMime = 'audio/mpeg'): Promise<boolean> {
+  const [first, ...rest] = parts;
+  if (!first || !allowed(kind)) return false;
+  rest.forEach((text) => { void cachedVoice(text).catch(() => null); });
+  if (!(await say(first, kind, firstAudioBase64, audioMime))) return false;
+  for (const text of rest) if (!(await say(text, kind))) return false;
+  return true;
 }
 
 // A screen that speaks once per situation: `key` names the situation (a search,

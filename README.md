@@ -43,7 +43,7 @@ Sous Windows, on peut aussi double-cliquer sur `LANCER_SIRA_WINDOWS.bat`.
   (`SIRA_MOBILE=false` pour ne jamais la lancer).
 - L'assistant vocal démarre s'il est installé (`npm run voice:setup`, une fois).
 
-**Connexion** : numéro **Orange (07)** puis code à 4 chiffres. En développement, le code s'affiche à l'écran, sans SMS.
+**Connexion** : numéro **Orange (07)** puis code à 6 chiffres. En développement, le code s'affiche à l'écran, sans SMS.
 
 **Sur un serveur** : `podman compose -f infra/compose.yaml up -d` (voir [docs/architecture.md](docs/architecture.md)).
 
@@ -113,6 +113,7 @@ le signale.
 | L'écran « Confidentialité », la suppression de compte | `mobile/app/privacy.tsx`, `services/community/app/main.py` |
 | Les modèles d'IA (voix) | `services/models/voice/` (hors Git, voir `services/models/README.md`) |
 | Les lieux, « Ma position », la carte | `mobile/lib/places.ts`, `mobile/components/osm-map-view*.tsx` |
+| Les catégories de la carte (Saveurs du coin, pharmacies de garde…) | `scripts/import-lieux.mjs`, `services/api/src/lieux/`, `mobile/components/lieux-*.tsx` : voir [docs/lieux.md](docs/lieux.md) |
 
 ## Vérifier que tout marche
 
@@ -137,7 +138,9 @@ npx --prefix mobile tsc --noEmit -p mobile # typage de l'appli mobile
 
 ## Pour aller plus loin
 
+- [SIRA en bref](docs/resume-sira.md) : résumé du produit, des technologies et du déploiement
 - [Architecture technique](docs/architecture.md) : ports, API, moteur, données, sécurité, limites
+- [Lieux du quotidien](docs/lieux.md) : catégories de la carte, import des sources, pharmacies de garde ; [scénario de démo](docs/demo-lieux.md)
 - [Assistant vocal](services/voice/README.md) : installation, modèles, API, limites
 - [Documentation](docs/README.md) : cahier des charges, audits de données, PostGIS, voix
 - [Application mobile](mobile/README.md)

@@ -1,18 +1,14 @@
-// Confidentialité : ce que SIRA sait du voyageur (lu sur le serveur), ce qu'il
-// ne garde pas (et à qui la position est envoyée), l'état réel des
-// autorisations du téléphone, et la suppression définitive du compte.
+// Confidentialité : ce que SIRA sait du voyageur (lu sur le serveur) et ce qu'il
+// ne garde pas (et à qui la position est envoyée). Les autorisations du téléphone
+// sont dans Profil > Autorisations, la suppression du compte dans le Profil.
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Text } from '@/components/sira-text';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { DeleteAccountModal } from '@/components/delete-account-modal';
 import { goBack } from '@/lib/navigation';
-import {
-  canOpenSettings, openPhoneSettings, PERMISSION_LABELS, usePermissions, type PermissionKind, type PermissionState,
-} from '@/lib/permissions';
-import { MIC_NEEDS_HTTPS, POSITION_NEEDS_HTTPS } from '@/lib/secure-context';
 import { privacySummary, type PrivacySummary } from '@/lib/sira-api';
 import { useSession } from '@/lib/session';
 
@@ -22,13 +18,9 @@ type Icon = keyof typeof Ionicons.glyphMap;
 const NOT_KEPT: { icon: Icon; title: string; text: string }[] = [
   { icon: 'mic-off', title: 'Ta voix', text: "Elle sert seulement à comprendre ta demande, puis elle est effacée tout de suite, sur ton téléphone comme sur nos serveurs." },
   { icon: 'location', title: 'Ta position', text: "SIRA ne l'enregistre pas. Pour nommer l'endroit où tu es et chercher un lieu, elle est envoyée au service de cartes Photon (komoot, en Allemagne) ; pour un trajet en taxi, ton départ et ton arrivée passent par le service OSRM." },
+  { icon: 'bookmark', title: 'Tes lieux (Maison, Travail…)', text: "Ils restent sur ton téléphone. Ils partent seulement avec une question à SIRA, pour la comprendre, et ne sont pas gardés." },
   { icon: 'chatbubble-ellipses', title: 'Tes codes SMS', text: 'Ils sont effacés au bout de 24 heures.' },
   { icon: 'warning', title: 'Tes signalements', text: "Ils sont anonymes, visibles par tous les voyageurs, et disparaissent après quelques heures. N'y écris ni nom ni numéro de téléphone." },
-];
-
-const PERMISSIONS: { kind: PermissionKind; icon: Icon; title: string; why: string }[] = [
-  { kind: 'location', icon: 'navigate', title: 'Position', why: 'Pour partir de là où tu es et te prévenir avant de descendre.' },
-  { kind: 'microphone', icon: 'mic', title: 'Micro', why: 'Pour parler à SIRA. Ta voix n’est jamais gardée.' },
 ];
 
 const formatDate = (iso: string) => {
@@ -40,8 +32,6 @@ export default function PrivacyScreen() {
   const router = useRouter();
   const [data, setData] = useState<PrivacySummary | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [showDelete, setShowDelete] = useState(false);
-  const { states, request } = usePermissions();
   // Read once the stored session is back (after a reload it arrives a moment later).
   const token = useSession()?.token ?? null;
 
@@ -54,29 +44,12 @@ export default function PrivacyScreen() {
     return () => { alive = false; };
   }, [token]);
 
-  const permissionAction = (kind: PermissionKind, state: PermissionState) => {
-    if (state === 'unknown' || state === 'denied') {
-      return (
-        <TouchableOpacity style={styles.smallButton} onPress={() => void request(kind)} activeOpacity={0.85}>
-          <Text style={styles.smallButtonText}>Autoriser</Text>
-        </TouchableOpacity>
-      );
-    }
-    if ((state === 'granted' || state === 'blocked') && canOpenSettings) {
-      return (
-        <TouchableOpacity style={[styles.smallButton, styles.smallButtonOutline]} onPress={openPhoneSettings} activeOpacity={0.85}>
-          <Text style={styles.smallButtonText}>Réglages</Text>
-        </TouchableOpacity>
-      );
-    }
-    return null;
-  };
-
   const kept = data ? [
     { label: 'Numéro', value: data.phone_number },
     { label: 'Nom', value: data.full_name || 'Non renseigné' },
     { label: 'Compte créé le', value: formatDate(data.created_at) },
     { label: 'Prix partagés', value: data.fare_reports === 0 ? 'Aucun' : `${data.fare_reports}` },
+    { label: 'Trajets notés', value: data.trip_ratings ? `${data.trip_ratings}` : 'Aucun' },
   ] : [];
 
   return (
@@ -118,48 +91,9 @@ export default function PrivacyScreen() {
           ))}
         </View>
 
-        <Text style={styles.section}>Autorisations du téléphone</Text>
-        <View style={styles.card}>
-          {PERMISSIONS.map((permission, index) => {
-            const state = states[permission.kind];
-            return (
-              <View key={permission.kind} style={[styles.item, index > 0 && styles.rowBorder]}>
-                <View style={styles.itemIcon}><Ionicons name={permission.icon} size={16} color="#F26522" /></View>
-                <View style={styles.itemText}>
-                  <View style={styles.permissionHead}>
-                    <Text style={styles.itemTitle}>{permission.title}</Text>
-                    <Text style={[styles.status, state === 'granted' ? styles.statusOn : styles.statusOff]}>{PERMISSION_LABELS[state]}</Text>
-                  </View>
-                  <Text style={styles.itemBody}>{permission.why}</Text>
-                  {state === 'blocked' && !canOpenSettings && (
-                    <Text style={styles.hint}>Pour changer ce choix, passe par les réglages de ton navigateur.</Text>
-                  )}
-                  {state === 'insecure' && (
-                    <Text style={styles.hint}>{permission.kind === 'microphone' ? MIC_NEEDS_HTTPS : POSITION_NEEDS_HTTPS}</Text>
-                  )}
-                </View>
-                {permissionAction(permission.kind, state)}
-              </View>
-            );
-          })}
-        </View>
-        {!canOpenSettings && <Text style={styles.note}>Pour retirer une autorisation, passe par les réglages de ton navigateur.</Text>}
-
-        {token && <Text style={styles.section}>Mon compte</Text>}
-        {token && <TouchableOpacity style={[styles.card, styles.deleteRow]} onPress={() => setShowDelete(true)} activeOpacity={0.85}
-          accessibilityLabel="Supprimer mon compte">
-          <View style={styles.deleteIcon}><Ionicons name="trash" size={16} color="#FFFFFF" /></View>
-          <View style={styles.itemText}>
-            <Text style={styles.deleteTitle}>Supprimer mon compte</Text>
-            <Text style={styles.itemBody}>Efface ton numéro, ton nom et tes prix partagés, pour de bon.</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={18} color="#E53935" />
-        </TouchableOpacity>}
-
         <Text style={styles.footer}>Tes données personnelles sont protégées par la loi ivoirienne n° 2013-450.</Text>
       </ScrollView>
 
-      <DeleteAccountModal visible={showDelete} onClose={() => setShowDelete(false)} />
     </SafeAreaView>
   );
 }

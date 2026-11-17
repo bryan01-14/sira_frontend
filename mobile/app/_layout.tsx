@@ -1,18 +1,36 @@
+import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
 import { useEffect } from 'react';
 import { restoreSession } from '@/lib/session';
 import { loadIntroMemory } from '@/lib/motion';
+import { loadSavedPlaces } from '@/lib/saved-places';
+import { loadFavorites } from '@/lib/favorites';
+import { loadTripHistory } from '@/lib/trip-history';
+import { loadUsage } from '@/lib/usage';
 import { loadVoiceMode } from '@/lib/voice';
 import { SpeakingPill } from '@/components/speaking-pill';
+import { FollowedZoneAlerts } from '@/components/followed-zone-alerts';
+import { SuccessHost } from '@/components/success-card';
+import { loadFollowedZones } from '@/lib/followed-zones';
+import { loadProfilePicture } from '@/lib/profile-picture';
+import { loadReportOpinions } from '@/lib/report-opinions';
+import { loadWebFonts, MONTSERRAT_FONTS } from '@/components/sira-text';
 
 export const unstable_settings = {
   anchor: '(tabs)',
 };
 
 export default function RootLayout() {
-  useEffect(() => { void restoreSession(); void loadIntroMemory(); void loadVoiceMode(); }, []);
+  useEffect(() => { void restoreSession(); void loadIntroMemory(); void loadVoiceMode(); void loadSavedPlaces(); void loadTripHistory(); void loadFavorites(); void loadUsage(); void loadFollowedZones(); void loadProfilePicture(); void loadReportOpinions(); }, []);
+  // Montserrat before the first screen, so no text flashes in the system font.
+  // Without it (failed download on web), the screens fall back to the system font.
+  const [fontsLoaded, fontError] = useFonts(MONTSERRAT_FONTS);
+  // Web: every weight starts downloading now, without holding the first screen
+  // (about 2 MB of fonts, several seconds on a slow mobile connection).
+  useEffect(() => { if (fontsLoaded) void loadWebFonts(); }, [fontsLoaded]);
+  if (!fontsLoaded && !fontError) return null;
   return (
     <>
       <Stack
@@ -168,6 +186,14 @@ export default function RootLayout() {
         />
 
         <Stack.Screen
+          name="permissions"
+          options={{
+            headerShown: false,
+            animation: 'slide_from_right',
+          }}
+        />
+
+        <Stack.Screen
           name="location-settings"
           options={{
             headerShown: false,
@@ -184,7 +210,23 @@ export default function RootLayout() {
         />
 
         <Stack.Screen
+          name="voice-settings"
+          options={{
+            headerShown: false,
+            animation: 'slide_from_right',
+          }}
+        />
+
+        <Stack.Screen
           name="info-settings"
+          options={{
+            headerShown: false,
+            animation: 'slide_from_right',
+          }}
+        />
+
+        <Stack.Screen
+          name="my-places"
           options={{
             headerShown: false,
             animation: 'slide_from_right',
@@ -202,6 +244,9 @@ export default function RootLayout() {
 
       {/* While SIRA talks by itself, every screen shows how to stop it. */}
       <SpeakingPill />
+      <FollowedZoneAlerts />
+      {/* « … avec succès » cards (favourites), above every screen. */}
+      <SuccessHost />
       <StatusBar style="light" />
     </>
   );

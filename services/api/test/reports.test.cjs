@@ -6,7 +6,7 @@ const { TransportGraph } = require("../dist/mobility/transport-graph.js");
 
 const PLATEAU = { lat: 5.3196, lon: -4.0201 };
 const author = "author-client-01";
-const create = (service, overrides = {}) => service.add({ type: "accident", ...PLATEAU, location: "Plateau", clientId: author, ...overrides });
+const create = (service, overrides = {}) => service.add({ type: "accident", ...PLATEAU, location: "Plateau", ...overrides }, author);
 
 test("un signalement démarre à l'état SIGNALÉ avec expiration et sévérité par type", () => {
   const report = create(new ReportsService());
@@ -16,11 +16,10 @@ test("un signalement démarre à l'état SIGNALÉ avec expiration et sévérité
   assert.ok(Date.parse(report.expiresAt) > Date.parse(report.createdAt));
 });
 
-test("rejette un type inconnu, une position hors Grand Abidjan ou un client invalide", () => {
+test("rejette un type inconnu ou une position hors Grand Abidjan", () => {
   const service = new ReportsService();
   assert.throws(() => create(service, { type: "meteor" }), /Type de signalement/);
   assert.throws(() => create(service, { lat: 48.85, lon: 2.35 }), /Grand Abidjan/);
-  assert.throws(() => create(service, { clientId: "x" }), /Identifiant client/);
 });
 
 test("cycle SIGNALÉ → CONFIRMÉ → FIABLE par confirmations d'autres utilisateurs", () => {
@@ -106,4 +105,47 @@ test("le graphe contourne une zone à éviter et échoue si tout est bloqué", (
   assert.ok(route);
   assert.deepEqual(route.legs.map((leg) => leg.lineId), ["SUD"]);
   assert.equal(graph.route({ lon: -4, lat: 5 }, { lon: -3.98, lat: 5 }, "balanced", { ...options, avoidAreas: [avoidNorth, avoidSouth] }), null);
+});
+
+// ---- les signalements survivent à un redémarrage de l'API (reports.service.ts, SIRA_REPORTS_FILE) ----
+const fs = require("node:fs");
+const os = require("node:os");
+const path = require("node:path");
+const { reportsFile } = require("../dist/reports/reports.service.js");
+const tempFile = () => path.join(fs.mkdtempSync(path.join(os.tmpdir(), "sira-reports-")), "runtime", "reports.json");
+
+test("redémarrage : signalements, votes et statut sont repris du fichier", () => {
+  const file = tempFile();
+  const before = new ReportsService(file);
+  const report = create(before);
+  before.vote(report.id, "witness-client-1", "confirm");
+  assert.ok(fs.existsSync(file), "le fichier est créé avec son dossier");
+  const after = new ReportsService(file); // nouvelle instance = API redémarrée
+  const [again] = after.list();
+  assert.equal(again.id, report.id);
+  assert.equal(again.status, "confirmed");
+  // les votants sont repris : ni l'auteur ni le premier témoin ne peuvent revoter
+  assert.throws(() => after.vote(report.id, author, "confirm"), /déjà donné/);
+  assert.throws(() => after.vote(report.id, "witness-client-1", "confirm"), /déjà donné/);
+  assert.equal(after.vote(report.id, "witness-client-2", "confirm").status, "reliable");
+  assert.equal(new ReportsService(file).list()[0].status, "reliable");
+});
+
+test("redémarrage : un fichier abîmé ou des entrées invalides ne bloquent pas l'API", () => {
+  const file = tempFile();
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, "{ pas du json");
+  const service = new ReportsService(file);
+  assert.equal(service.list().length, 0);
+  create(service); // et le fichier est réécrit proprement
+  assert.equal(JSON.parse(fs.readFileSync(file, "utf-8")).reports.length, 1);
+  fs.writeFileSync(file, JSON.stringify({ version: 1, reports: [{ id: "x", type: "meteor" }, null], voters: {} }));
+  assert.equal(new ReportsService(file).list().length, 0);
+});
+
+test("SIRA_REPORTS_FILE : chemin choisi, ou « memoire » pour ne rien écrire", () => {
+  assert.equal(reportsFile({ SIRA_REPORTS_FILE: "/app/runtime/reports.json" }), "/app/runtime/reports.json");
+  assert.equal(reportsFile({ SIRA_REPORTS_FILE: "memoire" }), null);
+  assert.match(reportsFile({}), /services[\\/]api[\\/]runtime[\\/]reports\.json$/);
+  assert.equal(new ReportsService().list().length, 0); // sans fichier : en mémoire, comme avant
 });

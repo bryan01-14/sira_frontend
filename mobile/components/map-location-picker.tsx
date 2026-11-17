@@ -2,7 +2,8 @@
 // the traveller moves the map (or taps a spot) and SIRA names the place
 // under the pin; one button confirms it as departure or destination.
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Text } from '@/components/sira-text';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PinMap } from '@/components/pin-map';
@@ -10,8 +11,10 @@ import { reversePlace, type Coordinates } from '@/lib/sira-api';
 import { ABIDJAN_CENTRE, GRAND_ABIDJAN_RADIUS_M, distanceM, nearestPlaceLabel, rememberPlace, useCurrentPlace } from '@/lib/places';
 
 type Props = {
-  purpose: 'departure' | 'arrival';
-  onConfirm: (title: string) => void;
+  // report: where a traveller's report happened (Signaler un événement).
+  purpose: 'departure' | 'arrival' | 'report';
+  // The place's name, and where it is.
+  onConfirm: (title: string, coordinates: Coordinates) => void;
   onBack: () => void;
 };
 
@@ -19,6 +22,8 @@ type Named = { title: string; subtitle: string; forKey: string };
 
 const keyOf = (point: Coordinates) => `${point.latitude.toFixed(5)},${point.longitude.toFixed(5)}`;
 const insideAbidjan = (point: Coordinates) => distanceM(point, ABIDJAN_CENTRE) <= GRAND_ABIDJAN_RADIUS_M;
+// The map counts as moved by the traveller beyond this: a map that settles on load moves less.
+const MOVED_M = 15;
 
 export function MapLocationPicker({ purpose, onConfirm, onBack }: Props) {
   const insets = useSafeAreaInsets();
@@ -33,10 +38,14 @@ export function MapLocationPicker({ purpose, onConfirm, onBack }: Props) {
 
   const centerKey = keyOf(center);
   const outside = !insideAbidjan(center);
+  // Without GPS the map opens on the city centre, a fixed point (Rue Ismael Coulibaly, Adjamé):
+  // it is not offered as a place until the traveller has moved the map or touched a spot.
+  const [startedOnGps] = useState(() => Boolean(gps));
+  const chosenByTraveller = startedOnGps || distanceM(center, initialCenter) > MOVED_M;
 
   // The place under the pin is named once the map has stopped for a moment.
   useEffect(() => {
-    if (moving || outside) return;
+    if (moving || outside || !chosenByTraveller) return;
     let cancelled = false;
     const timer = setTimeout(() => {
       reversePlace(center)
@@ -49,14 +58,16 @@ export function MapLocationPicker({ purpose, onConfirm, onBack }: Props) {
         });
     }, 450);
     return () => { cancelled = true; clearTimeout(timer); };
-  }, [center, centerKey, moving, outside]);
+  }, [center, centerKey, moving, outside, chosenByTraveller]);
 
-  const current = named?.forKey === centerKey ? named : null;
+  const current = chosenByTraveller && named?.forKey === centerKey ? named : null;
   const confirm = () => {
     if (!current || outside) return;
     rememberPlace(current.title, center);
-    onConfirm(current.title);
+    onConfirm(current.title, center);
   };
+  const label = purpose === 'departure' ? 'Départ' : purpose === 'report' ? 'Lieu de l’événement' : 'Destination';
+  const action = purpose === 'departure' ? 'Partir d’ici' : purpose === 'report' ? 'Placer l’événement ici' : 'Aller ici';
 
   return (
     <View style={styles.screen}>
@@ -95,9 +106,13 @@ export function MapLocationPicker({ purpose, onConfirm, onBack }: Props) {
             <Ionicons name="locate" size={22} color="#F26522" />
           </TouchableOpacity>
         )}
-        <Text style={styles.sheetLabel}>{purpose === 'departure' ? 'Départ' : 'Destination'}</Text>
+        <Text style={styles.sheetLabel}>{label}</Text>
         {outside ? (
           <Text style={styles.warning}>Ce point est hors du Grand Abidjan : SIRA ne couvre que le Grand Abidjan.</Text>
+        ) : !chosenByTraveller && !moving ? (
+          <Text style={[styles.placeSubtitle, styles.waiting]}>
+            {purpose === 'arrival' ? 'Déplace' : 'Ta position n’est pas connue : déplace'} la carte jusqu’{purpose === 'report' ? 'au lieu de l’événement' : 'à ton point'}, ou touche un endroit.
+          </Text>
         ) : current && !moving ? (
           <>
             <Text style={styles.placeTitle} numberOfLines={1}>{current.title}</Text>
@@ -116,7 +131,7 @@ export function MapLocationPicker({ purpose, onConfirm, onBack }: Props) {
           activeOpacity={0.85}
           accessibilityRole="button"
         >
-          <Text style={styles.confirmText}>{purpose === 'departure' ? 'Partir d’ici' : 'Aller ici'}</Text>
+          <Text style={styles.confirmText}>{action}</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -140,6 +155,7 @@ const styles = StyleSheet.create({
   placeTitle: { fontSize: 18, fontWeight: '800', color: '#111111' },
   placeSubtitle: { fontSize: 13, color: '#6B6B6B' },
   loadingRow: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44 },
+  waiting: { minHeight: 44, textAlignVertical: 'center' },
   warning: { fontSize: 14, color: '#B91C1C', fontWeight: '600', minHeight: 44 },
   confirm: { marginTop: 12, backgroundColor: '#F26522', borderRadius: 14, paddingVertical: 15, alignItems: 'center' },
   confirmDisabled: { opacity: 0.45 },

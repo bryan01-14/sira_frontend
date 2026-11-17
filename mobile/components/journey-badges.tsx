@@ -1,6 +1,7 @@
 // Compact line of the steps of a journey: walk minutes and line badges.
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import { Text } from '@/components/sira-text';
 import { Ionicons } from '@expo/vector-icons';
 import type { ApiJourney, LegMode } from '@/lib/sira-api';
 import { legBadges } from '@/lib/journey-format';
@@ -23,7 +24,7 @@ export function JourneyBadges({ journey }: { journey: ApiJourney }) {
           {badge.kind === 'walk' ? (
             <View style={styles.walk}>
               <Ionicons name="walk" size={16} color="#1F1F1F" />
-              <Text style={styles.walkText}>{badge.minutes}</Text>
+              <Text style={styles.walkText}>{badge.minutes} min</Text>
             </View>
           ) : (
             <View style={[styles.vehicle, { backgroundColor: MODE_COLORS[badge.mode] ?? '#1F1F1F' }]}>
@@ -41,7 +42,7 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 5 },
   separator: { color: '#9A9A9A', fontSize: 10 },
   walk: { flexDirection: 'row', alignItems: 'flex-end' },
-  walkText: { fontSize: 10, fontWeight: '700', color: '#1F1F1F', marginLeft: -1, marginBottom: -1 },
+  walkText: { fontSize: 10, fontWeight: '700', color: '#1F1F1F', marginLeft: 1, marginBottom: -1 },
   vehicle: { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: 6, paddingHorizontal: 7, paddingVertical: 3, maxWidth: 170 },
   vehicleText: { color: '#FFFFFF', fontWeight: '800', fontSize: 12 },
 });

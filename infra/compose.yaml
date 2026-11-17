@@ -34,10 +34,13 @@ services:
       SIRA_DATA_ROOT: /data
       SIRA_GRAPH_WORKER: "true"
       CORS_ORIGIN: http://localhost:8080
-      # production: only CORS_ORIGIN (services/api/src/cors.ts), like the community service.
-      SIRA_ENV: ${SIRA_ENV:-development}
+      # production (default): only CORS_ORIGIN (services/api/src/cors.ts), like the community service.
+      SIRA_ENV: ${SIRA_ENV:-production}
+      # Signalements des voyageurs : gardés dans ce fichier, sur le volume api_runtime, d'un redémarrage à l'autre.
+      SIRA_REPORTS_FILE: /app/runtime/reports.json
     volumes:
       - ../data:/data:ro,Z
+      - api_runtime:/app/runtime:Z
     expose: ["4000"]
     depends_on:
       postgres: { condition: service_healthy }
@@ -60,7 +63,9 @@ services:
       context: ../services/community
       dockerfile: Containerfile
     environment:
-      SIRA_ENV: ${SIRA_ENV:-development}
+      # Production by default: COMMUNITY_JWT_SECRET is required and the SMS code is never returned
+      # by the API. For a demo without SMS, set SIRA_ENV=development on purpose.
+      SIRA_ENV: ${SIRA_ENV:-production}
       COMMUNITY_DATABASE_URL: postgresql+psycopg://sira:sira_dev_password@postgres:5432/sira
       COMMUNITY_JWT_SECRET: ${COMMUNITY_JWT_SECRET:-}
       ORANGE_CLIENT_ID: ${ORANGE_CLIENT_ID:-}
@@ -79,7 +84,8 @@ services:
       dockerfile: Containerfile
     environment:
       SIRA_API_URL: http://api:4000/api/v1
-      VOICE_WHISPER_MODEL: ${VOICE_WHISPER_MODEL:-small}
+      # Vide : sira-small-ft (Whisper affiné SIRA) s'il est dans services/models/voice/whisper/, sinon small.
+      VOICE_WHISPER_MODEL: ${VOICE_WHISPER_MODEL:-}
     volumes:
       - ../services/models/voice:/models/voice:ro,Z
       - voice_cache:/root/.cache:Z
@@ -143,6 +149,7 @@ services:
     restart: unless-stopped
 
 volumes:
+  api_runtime:
   voice_cache:
   postgres_data:
   valkey_data:

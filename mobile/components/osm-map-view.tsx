@@ -1,13 +1,38 @@
 import React, { useEffect, useRef } from 'react';
-import { StyleSheet, View, ViewStyle, Text } from 'react-native';
+import { StyleSheet, View, ViewStyle } from 'react-native';
+import { Text } from '@/components/sira-text';
 import MapView, {
+  Circle,
   Marker,
   Polyline,
   PROVIDER_DEFAULT,
 } from 'react-native-maps';
-import { Ionicons } from '@expo/vector-icons';
-import { ABIDJAN_COORDINATES_MAP } from '@/services/osrm-service';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { knownPlace } from '@/lib/places';
 import type { Coordinates, TrafficReport } from '@/lib/sira-api';
+import { routeLabels, type CenterRequest, type MapPadding, type MapPlace, type MapRoute, type ZoomRequest } from '@/components/osm-map-types';
+import Animated, { Easing, useAnimatedStyle, useReducedMotion, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
+
+// The traveller's dot pulses: a wave grows out from under it and fades, so it is found at a
+// glance (as on the web map). Still for travellers who asked for less motion.
+function PulsingUserDot() {
+  const reduceMotion = useReducedMotion();
+  const wave = useSharedValue(0);
+  useEffect(() => {
+    if (reduceMotion) return;
+    wave.value = withRepeat(withTiming(1, { duration: 2000, easing: Easing.out(Easing.quad) }), -1, false);
+  }, [reduceMotion, wave]);
+  const waveStyle = useAnimatedStyle(() => ({
+    opacity: 0.45 * (1 - wave.value),
+    transform: [{ scale: 1 + 2.4 * wave.value }],
+  }));
+  return (
+    <View style={styles.userDotBox}>
+      {!reduceMotion && <Animated.View style={[styles.userWave, waveStyle]} />}
+      <View style={styles.userMarker} />
+    </View>
+  );
+}
 
 interface OsmMapViewProps {
   departureName?: string;
@@ -16,13 +41,34 @@ interface OsmMapViewProps {
   origin?: Coordinates | null;
   destination?: Coordinates | null;
   routeCoordinates?: { latitude: number; longitude: number }[];
+  // Other journeys, in grey under the chosen one; the map frames them all.
+  alternativeRoutes?: MapRoute[];
+  onRoutePress?: (id: string) => void;
+  // Label of the chosen journey (« Coulé · 35 min »), shown with the others' labels.
+  routeLabel?: string;
   // One step of the journey, touched in its detail: drawn darker, and the map zooms on it.
   focusCoordinates?: Coordinates[] | null;
   reports?: TrafficReport[];
   onReportPress?: (report: TrafficReport) => void;
+  // Lieux du quotidien (catégories de l'accueil) et position du voyageur ; la carte se cadre sur eux.
+  places?: MapPlace[];
+  onPlacePress?: (id: string) => void;
+  userPosition?: Coordinates | null;
+  padding?: MapPadding;
+  // Boutons + / − d'un écran : chaque nouvelle valeur de key zoome de delta niveaux.
+  zoomRequest?: ZoomRequest | null;
+  // Centrer la carte sur le voyageur dès que sa position est connue (écran Trafic).
+  centerOnUser?: boolean;
+  // Marge d'erreur de la position du voyageur, en mètres : un cercle bleu pâle autour du point.
+  userAccuracyM?: number | null;
+  // Bouton « Ma position » : recentre la carte à chaque nouvelle key.
+  centerRequest?: CenterRequest | null;
   style?: ViewStyle;
   showIntermediateStations?: boolean;
 }
+
+// Même couleur que la légende de l'écran Trafic : à confirmer, confirmé, fiable.
+const REPORT_STATUS_COLOR: Record<string, string> = { reported: '#F59E0B', confirmed: '#EF4444', reliable: '#991B1B' };
 
 // Default Abidjan initial region
 const ABIDJAN_REGION = {
@@ -39,22 +85,72 @@ const INTERMEDIATE_STATIONS = [
   { name: "Cocody Riviera 3", latitude: 5.3480, longitude: -3.9650 },
 ];
 
+const NO_ROUTES: MapRoute[] = [];
+
 export function OsmMapView({
   departureName,
   arrivalName,
   origin,
   destination,
   routeCoordinates: activeRoute = [],
+  alternativeRoutes = NO_ROUTES,
+  onRoutePress,
+  routeLabel,
   focusCoordinates,
   reports = [],
   onReportPress,
+  places = [],
+  onPlacePress,
+  userPosition,
+  padding,
+  zoomRequest,
+  centerOnUser = false,
+  userAccuracyM = null,
+  centerRequest = null,
   style,
   showIntermediateStations = false,
 }: OsmMapViewProps) {
   const mapRef = useRef<MapView>(null);
 
-  const startCoords = origin ?? (departureName ? ABIDJAN_COORDINATES_MAP[departureName] : undefined);
-  const endCoords = destination ?? (arrivalName ? ABIDJAN_COORDINATES_MAP[arrivalName] : undefined);
+  // Boutons + / − : une demande de zoom par nouvelle key. Un niveau de zoom = l'écart de la région ×2 ou ÷2.
+  const zoomKey = zoomRequest?.key;
+  useEffect(() => {
+    if (zoomKey === undefined || !zoomRequest || !mapRef.current) return;
+    const factor = 2 ** -zoomRequest.delta;
+    mapRef.current.getMapBoundaries().then(({ northEast, southWest }) => {
+      mapRef.current?.animateToRegion({
+        latitude: (northEast.latitude + southWest.latitude) / 2,
+        longitude: (northEast.longitude + southWest.longitude) / 2,
+        latitudeDelta: Math.min(Math.abs(northEast.latitude - southWest.latitude) * factor, 2),
+        longitudeDelta: Math.min(Math.abs(northEast.longitude - southWest.longitude) * factor, 2),
+      }, 250);
+    }).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- seule une nouvelle key déclenche un zoom
+  }, [zoomKey]);
+
+  // Centré une fois sur le voyageur : ensuite, il déplace la carte librement.
+  const centered = useRef(false);
+  const userLat = userPosition?.latitude;
+  const userLon = userPosition?.longitude;
+  useEffect(() => {
+    if (!centerOnUser || centered.current || userLat === undefined || userLon === undefined || !mapRef.current) return;
+    centered.current = true;
+    mapRef.current.animateToRegion({ latitude: userLat, longitude: userLon, latitudeDelta: 0.06, longitudeDelta: 0.06 }, 600);
+  }, [centerOnUser, userLat, userLon]);
+
+  // Without coordinates, the name is looked up (own position: the live GPS one, never a fixed point).
+  // Bouton « Ma position » : une demande par nouvelle key.
+  const centerKey = centerRequest?.key;
+  useEffect(() => {
+    if (centerKey === undefined || !centerRequest || !mapRef.current) return;
+    const { latitude, longitude } = centerRequest.coordinates;
+    const delta = centerRequest.wide ? 0.06 : 0.02;
+    mapRef.current.animateToRegion({ latitude, longitude, latitudeDelta: delta, longitudeDelta: delta }, 600);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- seule une nouvelle key recentre
+  }, [centerKey]);
+
+  const startCoords = origin ?? (departureName ? knownPlace(departureName) ?? undefined : undefined);
+  const endCoords = destination ?? (arrivalName ? knownPlace(arrivalName) ?? undefined : undefined);
 
   // Fit bounds dynamically when route or markers update
   useEffect(() => {
@@ -65,10 +161,15 @@ export function OsmMapView({
           animated: true,
         });
       } else if (activeRoute.length > 0) {
-        mapRef.current.fitToCoordinates(activeRoute, {
+        mapRef.current.fitToCoordinates([...activeRoute, ...alternativeRoutes.flatMap((route) => route.coordinates)], {
           edgePadding: { top: 70, right: 60, bottom: 70, left: 60 },
           animated: true,
         });
+      } else if (places.length > 0) {
+        mapRef.current.fitToCoordinates(
+          [...places.map((place) => ({ latitude: place.lat, longitude: place.lon })), ...(userPosition ? [userPosition] : [])],
+          { edgePadding: padding ?? { top: 70, right: 60, bottom: 70, left: 60 }, animated: true },
+        );
       } else if (startCoords && endCoords) {
         mapRef.current.fitToCoordinates([startCoords, endCoords], {
           edgePadding: { top: 70, right: 60, bottom: 70, left: 60 },
@@ -76,7 +177,7 @@ export function OsmMapView({
         });
       }
     }
-  }, [activeRoute, focusCoordinates, startCoords, endCoords]);
+  }, [activeRoute, alternativeRoutes, focusCoordinates, startCoords, endCoords, places, userPosition, padding]);
 
   return (
     <View style={[styles.container, style]}>
@@ -129,14 +230,57 @@ export function OsmMapView({
             key={report.id}
             coordinate={{ latitude: report.lat, longitude: report.lon }}
             title={report.title}
-            description={`${report.location} · ${report.status === 'reported' ? 'à confirmer' : 'confirmé'}`}
+            description={`${report.location} · ${report.status === 'reported' ? 'à confirmer' : report.status === 'reliable' ? 'fiable' : 'confirmé'}`}
             anchor={{ x: 0.5, y: 0.5 }}
+            zIndex={2}
             onPress={() => onReportPress?.(report)}
           >
-            <View style={[styles.reportMarker, report.status === 'reported' && styles.reportMarkerPending]}>
+            <View style={[styles.reportMarker, { backgroundColor: REPORT_STATUS_COLOR[report.status] ?? REPORT_STATUS_COLOR.confirmed }]}>
               <Ionicons name="warning" size={12} color="#FFFFFF" />
             </View>
           </Marker>
+        ))}
+
+        {/* Traveller's position and everyday places (categories of the home screen) */}
+        {userPosition && userAccuracyM ? (
+          <Circle
+            center={userPosition}
+            radius={userAccuracyM}
+            fillColor="rgba(37, 99, 235, 0.12)"
+            strokeColor="rgba(37, 99, 235, 0.35)"
+            strokeWidth={1.5}
+          />
+        ) : null}
+        {userPosition && (
+          <Marker coordinate={userPosition} anchor={{ x: 0.5, y: 0.5 }} title="Ma position" zIndex={0}>
+            <PulsingUserDot />
+          </Marker>
+        )}
+        {places.map((place) => (
+          <Marker
+            key={place.id}
+            coordinate={{ latitude: place.lat, longitude: place.lon }}
+            title={place.label}
+            anchor={{ x: 0.5, y: 0.5 }}
+            zIndex={1}
+            onPress={() => onPlacePress?.(place.id)}
+          >
+            <View style={[styles.placeMarker, place.highlighted && styles.placeMarkerGarde, { backgroundColor: place.color }]}>
+              <MaterialCommunityIcons name={place.icon as keyof typeof MaterialCommunityIcons.glyphMap} size={place.highlighted ? 19 : 16} color="#FFFFFF" />
+            </View>
+          </Marker>
+        ))}
+
+        {/* Other journeys in grey, under the chosen one: touching one chooses it */}
+        {alternativeRoutes.filter((route) => route.coordinates.length > 1).map((route) => (
+          <Polyline
+            key={`alternative-${route.id}`}
+            coordinates={route.coordinates}
+            strokeColor="#7C828C"
+            strokeWidth={5}
+            tappable={Boolean(onRoutePress)}
+            onPress={() => onRoutePress?.(route.id)}
+          />
         ))}
 
         {/* Journey computed by the SIRA engine */}
@@ -150,6 +294,21 @@ export function OsmMapView({
         {focusCoordinates && focusCoordinates.length > 1 && (
           <Polyline coordinates={focusCoordinates} strokeColor="#1E1E1E" strokeWidth={7} />
         )}
+
+        {/* One label per journey drawn, where it parts from the others; touching another one chooses it */}
+        {routeLabels(activeRoute, routeLabel, alternativeRoutes).map((label) => (
+          <Marker
+            key={`label-${label.id ?? 'chosen'}`}
+            coordinate={label.point}
+            anchor={{ x: 0.5, y: 1 }}
+            zIndex={label.chosen ? 4 : 3}
+            onPress={() => { if (label.id) onRoutePress?.(label.id); }}
+          >
+            <View style={[styles.routeLabel, label.chosen && styles.routeLabelChosen]}>
+              <Text style={[styles.routeLabelText, label.chosen && styles.routeLabelTextChosen]}>{label.text}</Text>
+            </View>
+          </Marker>
+        ))}
       </MapView>
 
       {/* Map Badge */}
@@ -206,8 +365,63 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  reportMarkerPending: {
-    opacity: 0.6,
+  // Room for the wave around the dot (it grows to 3.4 times the dot).
+  userDotBox: {
+    width: 56,
+    height: 56,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  userWave: {
+    position: 'absolute',
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: '#2563EB',
+  },
+  userMarker: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: '#2563EB',
+    borderWidth: 3,
+    borderColor: '#FFFFFF',
+  },
+  placeMarker: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  placeMarkerGarde: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 3,
+    borderColor: '#FACC15',
+  },
+  routeLabel: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#D4D4D4',
+  },
+  routeLabelChosen: {
+    backgroundColor: '#F26522',
+    borderColor: '#F26522',
+  },
+  routeLabelText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#111111',
+  },
+  routeLabelTextChosen: {
+    color: '#FFFFFF',
   },
   endMarkerBadge: {
     alignItems: 'center',

@@ -3,10 +3,12 @@
 // opens again). The recording stops by itself when the traveller stops talking,
 // and it is deleted from the phone as soon as it is sent (lib/use-microphone).
 import { useEffect, useRef, useState } from 'react';
+import { savedPlaces, voicePlaces } from '@/lib/saved-places';
 import { askByText, askByVoice, type Coordinates, type VoiceAudio, type VoiceContext, type VoiceReply, type VoiceTrip } from '@/lib/sira-api';
 import { useMicrophone } from '@/lib/use-microphone';
-import { say, stopSpeaking } from '@/lib/voice';
+import { getVoiceMode, sayParts, stopSpeaking } from '@/lib/voice';
 import { MIC_NEEDS_HTTPS, needsSecureContext } from '@/lib/secure-context';
+import { getUsage, USAGE_OFF_MESSAGES } from '@/lib/usage';
 
 export type VoicePhase = 'idle' | 'recording' | 'thinking' | 'answered' | 'error';
 
@@ -46,13 +48,16 @@ export function useVoiceAssistant(position: Coordinates | null, trip: VoiceTrip 
     }
     if (!open.current) return;
     context.current = answer.context;
-    retries.current = answer.kind === 'retry' ? retries.current + 1 : 0;
-    const giveUp = answer.kind === 'retry' && retries.current >= MAX_RETRIES;
-    const shown = giveUp ? { ...answer, reply_text: OFFER_OTHER_WAY, reply_audio: null } : answer;
+    // Only spoken questions count: a typed one was not « badly heard », so no « I can't hear you ».
+    retries.current = aloud && answer.kind === 'retry' ? retries.current + 1 : 0;
+    const giveUp = aloud && answer.kind === 'retry' && retries.current >= MAX_RETRIES;
+    const shown = giveUp ? { ...answer, reply_text: OFFER_OTHER_WAY, reply_parts: [OFFER_OTHER_WAY], reply_audio: null } : answer;
     setOfferTyping(giveUp);
     setReply(shown);
     setBusy('answered');
-    if (aloud) await say(shown.reply_text, 'answer', shown.reply_audio?.base64 ?? null);
+    // Older voice service (no reply_parts): its audio is the whole reply.
+    const parts = shown.reply_parts?.length ? shown.reply_parts : [shown.reply_text];
+    if (aloud) await sayParts(parts, 'answer', shown.reply_audio?.base64 ?? null, shown.reply_audio?.mime);
     if (!open.current) return;
     setHeard(shown);
     // A question or « répète » : listen again right away, hands-free.
@@ -60,8 +65,12 @@ export function useVoiceAssistant(position: Coordinates | null, trip: VoiceTrip 
     if (listenAgain && open.current) await listenAgainRef.current();
   };
 
+
+  // One call (transcription and answer together): measured on 2026-11-08, two calls (« what SIRA heard », then the
+  // answer) showed the words barely earlier (0.4 to 1.7 s) but the answer 1 to 2.5 s later.
   const microphone = useMicrophone((audio: VoiceAudio | null) => handle(audio
-    ? askByVoice(audio, position, context.current, true, trip)
+    // Voice muted: no need for the server to make SIRA's voice (lighter, faster answer).
+    ? askByVoice(audio, position, context.current, getVoiceMode() !== 'off', trip, voicePlaces(savedPlaces()))
     // Nothing heard counts as a misunderstanding: polite reprompt, then other ways.
     : Promise.resolve({
       reply_text: NOTHING_HEARD, context: context.current, journey_request: null, journeys: null,
@@ -71,7 +80,9 @@ export function useVoiceAssistant(position: Coordinates | null, trip: VoiceTrip 
   const listen = async () => {
     setError(null);
     if (!(await microphone.start())) {
-      setError(needsSecureContext() ? MIC_NEEDS_HTTPS : 'Autorise le micro pour parler à SIRA.');
+      setError(needsSecureContext() ? MIC_NEEDS_HTTPS
+        : !getUsage().microphone ? USAGE_OFF_MESSAGES.microphone
+        : 'Autorise le micro pour parler à SIRA.');
       setBusy('error');
     }
   };
@@ -79,7 +90,8 @@ export function useVoiceAssistant(position: Coordinates | null, trip: VoiceTrip 
 
   // Microphone button: start listening, or send right away without waiting.
   const toggle = () => (microphone.listening ? microphone.finish(true) : listen());
-  const ask = (text: string, { aloud = true } = {}) => handle(askByText(text, position, context.current, aloud, trip), aloud);
+  const ask = (text: string, { aloud = true } = {}) =>
+    handle(askByText(text, position, context.current, aloud && getVoiceMode() !== 'off', trip, voicePlaces(savedPlaces())), aloud);
 
   // Closing the assistant: microphone released, voice stopped, new conversation next time.
   const reset = () => {

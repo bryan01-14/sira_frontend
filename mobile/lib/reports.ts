@@ -1,22 +1,13 @@
 // Community reports shared by the traffic, report and navigation screens:
-// live list (Socket.IO + periodic reload), category mapping and the
-// anonymous device id used to prevent double votes.
+// live list (Socket.IO + periodic reload) and category mapping.
 import { useEffect, useSyncExternalStore } from 'react';
-import { Platform } from 'react-native';
 import { io, type Socket } from 'socket.io-client';
+import { CATEGORY_TYPE } from '@/lib/report-summary-core';
 import { apiBaseUrl, listReports, type TrafficReport } from '@/lib/sira-api';
 import type { Ionicons } from '@expo/vector-icons';
 
-// Maquette category ids -> API report types.
-export const REPORT_TYPE_BY_CATEGORY: Record<string, string> = {
-  accident: 'accident',
-  embouteillage: 'traffic',
-  route_bloquee: 'blocked',
-  inondation: 'flood',
-  route_degradee: 'road_damage',
-  vehicule_panne: 'breakdown',
-  autre: 'other',
-};
+// Screen category ids -> API report types (lib/report-summary-core.ts).
+export const REPORT_TYPE_BY_CATEGORY: Record<string, string> = CATEGORY_TYPE;
 
 export const REPORT_STYLE: Record<string, { color: string; icon: keyof typeof Ionicons.glyphMap }> = {
   accident: { color: '#EF4444', icon: 'car-sport' },
@@ -39,24 +30,6 @@ export function timeAgo(iso: string) {
   if (minutes < 1) return 'À l’instant';
   if (minutes < 60) return `Il y a ${minutes} min`;
   return `Il y a ${Math.round(minutes / 60)} h`;
-}
-
-// Anonymous id: persisted in the browser on web, per app launch on native
-// (no account yet; it only stops a device from voting twice).
-let memoryClientId: string | null = null;
-export function clientId() {
-  const make = () => `m${Date.now().toString(36)}${Math.random().toString(36).slice(2, 12)}`;
-  if (Platform.OS === 'web') {
-    try {
-      const stored = window.localStorage.getItem('sira-client-id');
-      if (stored) return stored;
-      const created = make();
-      window.localStorage.setItem('sira-client-id', created);
-      return created;
-    } catch { /* stockage indisponible */ }
-  }
-  memoryClientId ??= make();
-  return memoryClientId;
 }
 
 const ACTIVE: TrafficReport['status'][] = ['reported', 'confirmed', 'reliable'];
@@ -90,6 +63,15 @@ function connect() {
   // Expired events are not broadcast: a periodic reload drops them.
   timer = setInterval(reload, 60_000);
   void reload();
+}
+
+// Number on the bell of every screen: the travellers' reports still active, live. 0 = no badge.
+export function useAlertCount() {
+  return useLiveReports().reports.length;
+}
+
+export function alertBadge(count: number) {
+  return count > 99 ? '99+' : String(count);
 }
 
 export function useLiveReports() {

@@ -1,98 +1,89 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   StyleSheet,
   View,
-  Text,
   TouchableOpacity,
+  Pressable,
   ScrollView,
   Dimensions,
-  Platform,
-  Alert,
 } from 'react-native';
+import { Text } from '@/components/sira-text';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
+import Animated, { FadeIn, FadeInDown, ReduceMotion } from 'react-native-reanimated';
 import { REPORT_CHOOSE } from '@/lib/spoken';
 import { useSpeech } from '@/lib/voice';
 import { StatusBar } from 'expo-status-bar';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons, FontAwesome5, MaterialCommunityIcons } from '@expo/vector-icons';
 import { CustomBottomTabBar, useTabBarSpace } from '@/components/custom-bottom-tab-bar';
+import { playIntroToday } from '@/lib/motion';
 import { goBack } from '@/lib/navigation';
+import { ensureCurrentPlace, useCurrentPlace } from '@/lib/places';
+import { alertBadge, useAlertCount, useLiveReports } from '@/lib/reports';
+import { summarizeReports, type ReportCategory } from '@/lib/report-summary-core';
 
 const { width } = Dimensions.get('window');
 
-// Banner sizes follow the screen: the character shrinks on narrow phones and
-// the bubble takes the room left beside it, so they never cover each other.
-const CHARACTER_WIDTH = Math.min(180, width * 0.42);
-const CHARACTER_HEIGHT = CHARACTER_WIDTH * (220 / 180);
-const BUBBLE_WIDTH = Math.max(150, width - CHARACTER_WIDTH - 18 - 14);
-// Three category cards per row: on narrow phones the labels get a smaller font
-// (« Embouteillage » must fit on one line, not be cut in the middle).
-const CARD_WIDTH = (width - 56) / 3;
-const NARROW_CARDS = CARD_WIDTH < 100;
+// The designer's screen is 804 px wide (2x): k turns its pixels into this phone's.
+const k = width / 804;
+// Banner of the design (city, crashed cars, bus, the SIRA character pointing), 804 × 540; the
+// bubble drawn into it was erased, it is written below (it says « tu », like the rest of SIRA).
+const BANNER_HEIGHT = 540 * k;
+// Three square cards per row: 198 px wide, 38 px apart, 66 px from the edges in the design.
+const CARD_SIZE = 198 * k;
+// « Embouteillage » must stay on one line inside its card: the label follows the card's width.
+const CARD_FONT = Math.min(12.5, CARD_SIZE / 8.8);
 
 interface EventCategory {
-  id: string;
+  id: ReportCategory;
   title: string;
   iconName: string;
-  iconFamily: 'FontAwesome5' | 'Ionicons';
+  iconFamily: 'FontAwesome5' | 'Ionicons' | 'MaterialCommunityIcons';
+}
+
+// Icons as in the design: crash, line of cars, barrier, drop, road, broken-down car, dots.
+const CATEGORIES: EventCategory[] = [
+  { id: 'accident', title: 'Accident', iconName: 'car-crash', iconFamily: 'FontAwesome5' },
+  { id: 'embouteillage', title: 'Embouteillage', iconName: 'car-multiple', iconFamily: 'MaterialCommunityIcons' },
+  { id: 'route_bloquee', title: 'Route bloquée', iconName: 'boom-gate', iconFamily: 'MaterialCommunityIcons' },
+  { id: 'inondation', title: 'Inondation', iconName: 'water', iconFamily: 'Ionicons' },
+  { id: 'route_degradee', title: 'Route\ndégradée', iconName: 'road', iconFamily: 'FontAwesome5' },
+  { id: 'vehicule_panne', title: 'Véhicule\nen panne', iconName: 'car-wrench', iconFamily: 'MaterialCommunityIcons' },
+  { id: 'autre', title: 'Autre\névénement', iconName: 'ellipsis-horizontal', iconFamily: 'Ionicons' },
+];
+
+// SIRA's orange for every kind: the icon and the name tell them apart (white, black and orange only).
+const SIRA_ORANGE = '#F26522';
+
+function CategoryIcon({ category, size, color = '#FFFFFF' }: { category: EventCategory; size: number; color?: string }) {
+  if (category.iconFamily === 'FontAwesome5') return <FontAwesome5 name={category.iconName as any} size={size - 2} color={color} />;
+  if (category.iconFamily === 'MaterialCommunityIcons') return <MaterialCommunityIcons name={category.iconName as any} size={size + 2} color={color} />;
+  return <Ionicons name={category.iconName as any} size={size} color={color} />;
 }
 
 export default function ReportEventScreen() {
   // The list ends above the bottom bar (its last item stays reachable on small phones).
   const tabBarSpace = useTabBarSpace();
   const router = useRouter();
-  const insets = useSafeAreaInsets();
-  const [selectedEvent, setSelectedEvent] = useState<string | null>(null);
+  const alertCount = useAlertCount();
   useSpeech('report:choose', REPORT_CHOOSE);
 
-  const categories: EventCategory[] = [
-    {
-      id: 'accident',
-      title: 'Accident',
-      iconName: 'car-crash',
-      iconFamily: 'FontAwesome5',
-    },
-    {
-      id: 'embouteillage',
-      title: 'Embouteillage',
-      iconName: 'car',
-      iconFamily: 'FontAwesome5',
-    },
-    {
-      id: 'route_bloquee',
-      title: 'Route bloquée',
-      iconName: 'road',
-      iconFamily: 'FontAwesome5',
-    },
-    {
-      id: 'inondation',
-      title: 'Inondation',
-      iconName: 'water',
-      iconFamily: 'Ionicons',
-    },
-    {
-      id: 'route_degradee',
-      title: 'Route\ndégradée',
-      iconName: 'warning',
-      iconFamily: 'Ionicons',
-    },
-    {
-      id: 'vehicule_panne',
-      title: 'Véhicule\nen panne',
-      iconName: 'tools',
-      iconFamily: 'FontAwesome5',
-    },
-    {
-      id: 'autre',
-      title: 'Autre\névènement',
-      iconName: 'ellipsis-horizontal',
-      iconFamily: 'Ionicons',
-    },
-  ];
+  // The travellers' active reports, live, counted on each card: around the traveller (whole Grand Abidjan without their position).
+  const { reports } = useLiveReports();
+  const here = useCurrentPlace();
+  useEffect(() => { void ensureCurrentPlace(); }, []);
+  const position = here.status === 'ready' && !here.outside ? here.coordinates : null;
+  const summary = summarizeReports(reports, position);
+  const near = summary.scope === 'near';
+
+  // Cards come in one after the other the first time today, then only fade in (lib/motion.ts).
+  const [intro] = useState(() => playIntroToday('report-event'));
+  const entering = (index: number) => (intro
+    ? FadeInDown.delay(120 + index * 45).duration(300).reduceMotion(ReduceMotion.System)
+    : FadeIn.duration(200).reduceMotion(ReduceMotion.System));
 
   const handleSelectCategory = (category: EventCategory) => {
-    setSelectedEvent(category.id);
     router.push({
       pathname: '/report-event-detail',
       params: {
@@ -100,6 +91,34 @@ export default function ReportEventScreen() {
         title: category.title.replace('\n', ' '),
       },
     });
+  };
+
+  const countLabel = (count: number) => (near ? `${count} signalé${count > 1 ? 's' : ''} près de toi` : `${count} signalé${count > 1 ? 's' : ''} en ce moment`);
+
+  const card = (category: EventCategory, index: number) => {
+    const count = summary.byCategory[category.id] ?? 0;
+    return (
+      <Animated.View key={category.id} entering={entering(index)}>
+        <Pressable
+          onPress={() => handleSelectCategory(category)}
+          accessibilityRole="button"
+          accessibilityLabel={`${category.title.replace('\n', ' ')}${count ? `, ${countLabel(count)}` : ''}`}
+          style={({ pressed }) => [styles.categoryCard, pressed && styles.categoryCardPressed]}
+        >
+          <View style={styles.categoryCircleIcon}>
+            <CategoryIcon category={category} size={Math.round(50 * k)} />
+          </View>
+          <Text style={styles.categoryTitle} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.75}>
+            {category.title}
+          </Text>
+          {count > 0 && (
+            <View style={styles.countPill}>
+              <Text style={styles.countPillText}>{count}</Text>
+            </View>
+          )}
+        </Pressable>
+      </Animated.View>
+    );
   };
 
   return (
@@ -113,21 +132,25 @@ export default function ReportEventScreen() {
             onPress={() => goBack(router)}
             style={styles.backBtnWrapper}
             activeOpacity={0.7}
+            accessibilityLabel="Retour"
           >
             <Ionicons name="arrow-back" size={24} color="#000000" />
           </TouchableOpacity>
 
-          <Text style={styles.headerTitle}>Signaler un évènement</Text>
+          <Text style={styles.headerTitle}>Signaler un événement</Text>
 
           <TouchableOpacity
             style={styles.headerIconButton}
             onPress={() => router.push('/notifications')}
             activeOpacity={0.8}
+            accessibilityLabel="Notifications"
           >
             <Ionicons name="notifications" size={22} color="#000000" />
-            <View style={styles.notificationBadge}>
-              <Text style={styles.badgeText}>5</Text>
-            </View>
+            {alertCount > 0 && (
+              <View style={styles.notificationBadge}>
+                <Text style={styles.badgeText}>{alertBadge(alertCount)}</Text>
+              </View>
+            )}
           </TouchableOpacity>
         </View>
 
@@ -136,74 +159,34 @@ export default function ReportEventScreen() {
           contentContainerStyle={[styles.scrollContent, { paddingBottom: tabBarSpace }]}
           showsVerticalScrollIndicator={false}
         >
-          {/* Top Banner Illustration with Assistant & Speech Bubble */}
+          {/* Banner of the design, with the character's speech bubble written over it. */}
           <View style={styles.bannerContainer}>
-            {/* Background Cityscape with cars & bus */}
             <Image
-              source={require('@/assets/images/city-traffic-accident-bg.png')}
-              style={styles.bannerBgImage}
+              source={require('@/assets/images/report-banner.png')}
+              style={styles.bannerImage}
               contentFit="cover"
             />
-            <View style={styles.bannerOverlay} />
-
-            {/* Speech Bubble */}
             <View style={styles.speechBubbleBox}>
               <Text style={styles.speechBubbleText}>
                 <Text style={styles.boldText}>En signalant un événement</Text>, tu nous aides
                 à <Text style={styles.boldText}>améliorer SIRA</Text> et à te proposer
-                des <Text style={styles.boldText}>itinéraires plus optimisés.</Text>
+                des <Text style={styles.boldText}>itinéraires plus optimisés</Text>.
               </Text>
               <View style={styles.speechBubblePointer} />
             </View>
-
-            {/* SIRA 3D Character Assistant */}
-            <Image
-              source={require('@/assets/images/sira-character-assistant.png')}
-              style={styles.characterImg}
-              contentFit="contain"
-            />
           </View>
 
           {/* Heading Section */}
           <View style={styles.headingSection}>
             <Text style={styles.mainHeading}>Que se passe-t-il ?</Text>
             <Text style={styles.subHeading}>
-              Choisis le type d'événement que tu veux signaler.
+              Choisis le type d’événement que tu veux signaler.
             </Text>
           </View>
 
-          {/* Event Category Grid (3 Columns) */}
+          {/* Seven kinds, three square cards per row. */}
           <View style={styles.gridContainer}>
-            {categories.map((category) => {
-              const isSelected = selectedEvent === category.id;
-              return (
-                <TouchableOpacity
-                  key={category.id}
-                  style={[
-                    styles.categoryCard,
-                    isSelected && styles.categoryCardSelected,
-                  ]}
-                  onPress={() => handleSelectCategory(category)}
-                  activeOpacity={0.8}
-                >
-                  <View style={styles.orangeCircleIcon}>
-                    {category.iconFamily === 'FontAwesome5' ? (
-                      <FontAwesome5 name={category.iconName as any} size={24} color="#FFFFFF" />
-                    ) : (
-                      <Ionicons name={category.iconName as any} size={26} color="#FFFFFF" />
-                    )}
-                  </View>
-                  <Text
-                    style={styles.categoryTitle}
-                    numberOfLines={2}
-                    adjustsFontSizeToFit
-                    minimumFontScale={0.75}
-                  >
-                    {category.title}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
+            {CATEGORIES.map((category, index) => card(category, index + 1))}
           </View>
         </ScrollView>
 
@@ -238,7 +221,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 18,
-    fontWeight: '800',
+    fontWeight: '500',
     color: '#000000',
   },
   headerIconButton: {
@@ -269,139 +252,130 @@ const styles = StyleSheet.create({
     paddingBottom: 90,
   },
   bannerContainer: {
-    height: 230,
     width: '100%',
+    height: BANNER_HEIGHT,
     position: 'relative',
     overflow: 'hidden',
-    backgroundColor: '#FFF8F5',
+    backgroundColor: '#FFFFFF',
   },
-  bannerBgImage: {
-    ...StyleSheet.absoluteFill,
+  bannerImage: {
     width: '100%',
     height: '100%',
-    opacity: 1,
   },
-  bannerOverlay: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: 'transparent',
-  },
+  // Where the design's bubble was (from x 160, 28 px down), a little wider for SIRA's font.
   speechBubbleBox: {
     position: 'absolute',
-    top: 20,
-    left: 18,
-    width: BUBBLE_WIDTH,
+    top: 28 * k,
+    left: 152 * k,
+    width: 318 * k,
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderWidth: 1,
-    borderColor: '#EAEAEA',
+    borderRadius: 30 * k,
+    paddingHorizontal: 18 * k,
+    paddingVertical: 16 * k,
     shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 4,
   },
   speechBubbleText: {
-    fontSize: 11,
-    color: '#333333',
-    lineHeight: 15,
+    fontSize: 23 * k,
+    lineHeight: 32 * k,
+    color: '#222222',
+    textAlign: 'center',
   },
   boldText: {
     fontWeight: '800',
     color: '#000000',
   },
+  // The tail, on the right, toward the character's face.
   speechBubblePointer: {
     position: 'absolute',
-    right: -8,
-    top: 30,
+    right: -14 * k,
+    bottom: 22 * k,
     width: 0,
     height: 0,
-    borderTopWidth: 6,
-    borderBottomWidth: 6,
-    borderLeftWidth: 8,
-    borderStyle: 'solid',
-    backgroundColor: 'transparent',
+    borderTopWidth: 10 * k,
+    borderBottomWidth: 10 * k,
+    borderLeftWidth: 16 * k,
     borderTopColor: 'transparent',
     borderBottomColor: 'transparent',
     borderLeftColor: '#FFFFFF',
   },
-  characterImg: {
-    position: 'absolute',
-    right: 5,
-    bottom: -5,
-    width: CHARACTER_WIDTH,
-    height: CHARACTER_HEIGHT,
-  },
   headingSection: {
     paddingHorizontal: 20,
-    marginTop: 16,
-    marginBottom: 16,
+    marginTop: 12,
+    marginBottom: 18,
     alignItems: 'center',
   },
   mainHeading: {
-    fontSize: 24,
-    fontWeight: '900',
-    color: '#000000',
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#111111',
     textAlign: 'center',
-    letterSpacing: 0.4,
   },
   subHeading: {
     fontSize: 13,
-    color: '#4A5568',
+    color: '#333333',
     textAlign: 'center',
-    marginTop: 6,
-    fontWeight: '500',
+    marginTop: 4,
     paddingHorizontal: 10,
   },
   gridContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    paddingHorizontal: 16,
-    justifyContent: 'space-between',
-    rowGap: 14,
+    paddingHorizontal: 66 * k,
+    columnGap: 38 * k,
+    rowGap: 34 * k,
   },
   categoryCard: {
-    width: CARD_WIDTH,
-    height: 112,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    paddingVertical: 12,
-    paddingHorizontal: NARROW_CARDS ? 2 : 4,
-    alignItems: 'center',
-    justifyContent: 'center',
+    width: CARD_SIZE,
+    height: CARD_SIZE,
+    backgroundColor: '#F4F5F7',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
-    elevation: 2,
+    borderColor: '#C9CDD3',
+    paddingHorizontal: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  categoryCardSelected: {
-    borderColor: '#F26522',
-    backgroundColor: '#FFF4EE',
+  categoryCardPressed: {
+    transform: [{ scale: 0.95 }],
+    borderColor: SIRA_ORANGE,
   },
-  orangeCircleIcon: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: '#F26522',
+  categoryCircleIcon: {
+    width: 102 * k,
+    height: 102 * k,
+    borderRadius: 51 * k,
+    backgroundColor: SIRA_ORANGE,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 6,
-    shadowColor: '#F26522',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
-    elevation: 4,
+    marginBottom: 10 * k,
+  },
+  countPill: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    minWidth: 22,
+    height: 22,
+    borderRadius: 11,
+    paddingHorizontal: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+    backgroundColor: '#111111',
+  },
+  countPillText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '800',
   },
   categoryTitle: {
-    fontSize: NARROW_CARDS ? 10.5 : 12,
-    fontWeight: '800',
-    color: '#000000',
+    fontSize: CARD_FONT,
+    fontWeight: '600',
+    color: '#111111',
     textAlign: 'center',
-    lineHeight: NARROW_CARDS ? 13 : 14,
+    lineHeight: CARD_FONT * 1.25,
   },
   bottomBarContainer: {
     flexDirection: 'row',

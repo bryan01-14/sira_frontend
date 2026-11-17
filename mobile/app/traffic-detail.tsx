@@ -2,18 +2,19 @@ import React, { useState, useMemo } from 'react';
 import {
   StyleSheet,
   View,
-  Text,
   TouchableOpacity,
   FlatList,
   ScrollView,
   Platform,
 } from 'react-native';
+import { Text } from '@/components/sira-text';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { CustomBottomTabBar, useTabBarSpace } from '@/components/custom-bottom-tab-bar';
 import { goBack } from '@/lib/navigation';
+import { alertBadge, useAlertCount } from '@/lib/reports';
 
 export interface ZoneReportItem {
   id: string;
@@ -49,6 +50,7 @@ export default function TrafficDetailScreen() {
   // The list ends above the bottom bar (its last item stays reachable on small phones).
   const tabBarSpace = useTabBarSpace();
   const router = useRouter();
+  const alertCount = useAlertCount();
   const params = useLocalSearchParams<{ category?: string }>();
   const [activeCategory, setActiveCategory] = useState<string>(
     params.category || 'accident'
@@ -108,7 +110,7 @@ export default function TrafficDetailScreen() {
             <Ionicons name="arrow-back" size={24} color="#000000" />
           </TouchableOpacity>
 
-          <Text style={styles.headerTitle}>Trafics</Text>
+          <Text style={styles.headerTitle}>Trafic</Text>
 
           <View style={styles.headerRightActions}>
             <TouchableOpacity
@@ -117,9 +119,11 @@ export default function TrafficDetailScreen() {
               activeOpacity={0.7}
             >
               <Ionicons name="notifications" size={22} color="#000000" />
-              <View style={styles.notificationBadge}>
-                <Text style={styles.notificationBadgeText}>5</Text>
-              </View>
+              {alertCount > 0 && (
+                <View style={styles.notificationBadge}>
+                  <Text style={styles.notificationBadgeText}>{alertBadge(alertCount)}</Text>
+                </View>
+              )}
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -174,7 +178,7 @@ export default function TrafficDetailScreen() {
         {/* Section Title & Subtitle */}
         <View style={styles.listHeaderContainer}>
           <Text style={styles.listMainTitle}>{getCategoryTitle()}</Text>
-          <Text style={styles.listSubtitle}>Faites attention !!!</Text>
+          <Text style={styles.listSubtitle}>Fais attention !</Text>
         </View>
 
         {/* Cards List */}

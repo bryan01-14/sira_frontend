@@ -14,10 +14,37 @@ Micro → Silero VAD + Whisper (voix → texte)
 | Brique | Modèle | Licence | Entraînement |
 |---|---|---|---|
 | Détecter la parole | Silero VAD (intégré à faster-whisper) | MIT | aucun |
-| Transcrire | Whisper `small` int8 (`turbo` possible) via faster-whisper | MIT | aucun pour l'instant |
+| Transcrire vite | Parakeet TDT 0.6B v3 int8 (ONNX, `onnx-asr`), ≈ 0,5 s par phrase | CC BY 4.0 | aucun pour l'instant |
+| Transcrire en secours | Whisper `small` int8 via faster-whisper, quand Parakeet n'est pas sûr d'un lieu | MIT | aucun pour l'instant |
 | Comprendre | CamemBERTv2 fine-tuné sur le dataset SIRA fr-CI v0.4 | MIT | notebook Colab |
-| Retrouver le lieu | règles phonétiques + RapidFuzz, 2 259 lieux (GTFS AbidjanTransport) | code SIRA / ODbL | aucun |
-| Parler | Piper `fr_FR-siwis-medium` | CC BY 4.0 | aucun |
+| Retrouver le lieu | règles phonétiques + RapidFuzz, 2 259 lieux (GTFS AbidjanTransport) + compléments | code SIRA / ODbL | aucun |
+| Aider quand les règles ne savent pas | Ministral 3 3B Q4_K_M dans llama-server (`app/llm.py`) : choisit un outil de SIRA, ne donne jamais un chiffre lui-même | Apache 2.0 | aucun |
+| Parler | Piper `fr_FR-upmc-medium`, « pierre » (homme) : la seule voix de SIRA, envoyée en MP3 | CC BY-SA 4.0 | aucun |
+
+**Compléments du répertoire de lieux** (`knowledge/lieux_complements.json`, dans Git) : le répertoire du notebook
+n'est pas modifié, ces corrections sont appliquées au chargement.
+
+- `ajouts` : lieux absents du GTFS, avec coordonnées et source : quelques lieux connus (Danga, Black Market, Angré 8e
+  Tranche…) et les quartiers et villages nommés dans OpenStreetMap (Mermoz, Wassakara, Sagbé Nord…) ;
+- `coordonnees` : lieux connus sans GPS (Blockhaus, Zone 4…), sinon SIRA les reconnaît mais ne peut pas y aller ;
+- `alias` : autres orthographes attestées d'un même lieu (Blockauss, Biétri…) ; un nom OSM presque identique à moins
+  de 1,5 km d'un lieu existant devient une variante de ce lieu plutôt qu'un doublon ;
+- `hors_reseau` (sur un ajout) : commune du Grand Abidjan hors du réseau de transport de SIRA (communes périphériques
+  de l'AMUGA sans ligne dans OSM : Bonoua, Alépé, Azaguié, Dabou, Jacqueville ; Grand-Bassam est desservi depuis
+  l'extraction OSM de 2026). La voix emmène jusqu'à la gare de départ si elle est attestée (`depart`) et le dit ;
+  sinon elle dit que le trajet n'est pas encore couvert, sans en inventer un ;
+- `arrets_osm` (généré par `corriger_lieux.py`) : arrêts nommés du réseau actuel (`data/processed`, extraction
+  OpenStreetMap) que le répertoire ne connaissait pas ; position = centre des quais du même nom ;
+- `exclus` : lieux volontairement absents et pourquoi (introuvables, ou homophones qui feraient hésiter un lieu existant) ;
+- `communes` : commune exacte de chaque lieu d'après les frontières OpenStreetMap, recalculée par
+  `services/voice/scripts/corriger_lieux.py` (le notebook la devinait d'après le centre de commune le plus proche).
+
+Un ajout se vérifie avec `npm run test:voice` (coordonnées dans le Grand Abidjan, identifiants `PL-C…` uniques).
+
+**Règle : rien d'inventé.** Chaque position vient d'une source (OpenStreetMap, arrêts du GTFS) ou d'un calcul explicite
+sur ces sources (ex. centre des arrêts qui portent le nom du quartier), écrit dans `source`. Une approximation est
+acceptée si sa méthode est dite ; un lieu introuvable n'est pas ajouté mais noté dans `exclus` (ex. Roxy). Une variante
+d'orthographe doit être attestée (nom OSM, nom d'arrêt) ou être la forme parlée d'un nombre écrit (« 8e » → « huitième »).
 
 ## Installation (une seule fois)
 
@@ -33,8 +60,10 @@ est cherché dans cet ordre :
 ```
 services/models/voice/
 ├── sira_models_v0.4/   CamemBERTv2 fine-tunés (intent + entités) + 2 259 lieux  (≈ 890 Mo)
-├── whisper/small/      Whisper (faster-whisper)                                 (≈ 480 Mo)
-└── piper/              voix française fr_FR-siwis-medium                        (≈ 63 Mo)
+├── parakeet-tdt-0.6b-v3-int8/  Parakeet, transcription rapide (onnx-asr)          (≈ 670 Mo)
+├── whisper/small/      Whisper (faster-whisper), en secours                     (≈ 480 Mo)
+├── whisper/sira-small-ft/  Whisper small affiné sur les voix d'Abidjan, pris par défaut s'il est là (≈ 240 Mo)
+└── piper/              voix fr_FR-upmc-medium, « pierre » (≈ 76 Mo)
 ```
 
 **2. Environnement Python + modèles prêts à l'emploi** :
@@ -71,13 +100,19 @@ npm run dev:voice
 | POST | `/voice/ask` | JSON `{text, position?, context?, trip?, speak?}` | pareil, à partir de texte |
 | POST | `/voice/understand` | JSON `{text, position?}` | compréhension seule (intent, entités, lieux, `journey_request`) |
 | POST | `/voice/answer` | multipart : `audio` | réponse courte pendant le trajet : `{transcript, answer: "yes"/"no"/null, amount}` (prix en FCFA, `null` s'il n'est pas clairement dit) — sans NLU ni calcul de trajet |
-| POST | `/voice/tts` | JSON `{text}` | `audio/wav` |
+| POST | `/voice/tts` | JSON `{text}` | voix de la phrase (`audio/mpeg`, ou `audio/wav` si l'encodage MP3 échoue) |
 | GET | `/voice/health` | — | état des composants |
 
 **Trajet en cours** (`trip`, aussi en champ multipart de `/voice/query`) : le trajet suivi dans l'app
 (`voiceTrip()` dans `mobile/lib/sira-api.ts`). Il permet de répondre à « je descends où ? », « ça fait combien ? »,
 « j'arrive à quelle heure ? » ou « y a des bouchons sur mon trajet ? » avec les chiffres de SIRA-MORE et les signalements
 des voyageurs. La réponse contient `sources` : fiche de la FAQ (`modes.gbaka`), `sira-more`, `signalements`, `lieux`.
+
+**SIRA parle phrase par phrase** : `reply_parts` découpe `reply_text` en phrases et `reply_audio` est la voix de la
+**première** seulement, envoyée sans attendre les autres. L'app joue `reply_audio`, puis demande les phrases suivantes
+à `/voice/tts` : le service les prépare déjà pendant ce temps (`SpokenCache`, en mémoire). Les phrases fixes de
+`dialog.py` (`FIXED_REPLIES`) sont produites au démarrage. Mesuré : premier son d'un trajet en ~0,5 à 1 s au lieu de
+1,3 à 3,4 s (`benchmarks/2026-10-25_latence-piper-llm.md`).
 
 **Dialogue de confirmation** : quand SIRA doute (lieu ambigu, destination manquante…), la réponse contient
 `reply_text` (la question) et `context`. L'app renvoie ce `context` tel quel avec la phrase suivante :
@@ -96,6 +131,7 @@ curl -X POST http://localhost:4000/api/v1/voice/ask -H "content-type: applicatio
 export type VoiceReply = {
   transcript?: { text: string };
   reply_text: string;
+  reply_parts?: string[];  // phrases de reply_text ; reply_audio = voix de reply_parts[0]
   context: Record<string, unknown> | null;
   journeys: JourneysResponse | null;
   reply_audio: { mime: string; base64: string } | null;
@@ -114,7 +150,7 @@ export async function askByVoice(audioUri: string, position: Coordinates | null,
 }
 ```
 
-Si `reply_audio` est vide (Piper non installé), lire `reply_text` avec la voix du téléphone (`expo-speech`).
+Si `reply_audio` est vide (Piper non installé), afficher `reply_text` sans le lire : SIRA n'a qu'une voix, pierre.
 
 ## Réglages (`.env`)
 
@@ -122,14 +158,24 @@ Si `reply_audio` est vide (Piper non installé), lire `reply_text` avec la voix 
 |---|---|---|
 | `VOICE_MODELS_ROOT` | `services/models/voice` | réserve des modèles de la voix (`/models/voice` dans le conteneur) |
 | `VOICE_MODELS_DIR` | `services/models/voice/sira_models_v0.4` | modèles entraînés sur Colab |
-| `VOICE_WHISPER_MODEL` | `small` | `small` (rapide, CPU), `turbo` (plus précis), `large-v3` (GPU) |
+| `VOICE_WHISPER_MODEL` | `sira-small-ft` s'il est installé, sinon `small` | `sira-small-ft` : affiné SIRA (6,4 et 8,6 % de mots faux au lieu de 20,2 et 22,3 %, 31/32 lieux au lieu de 26/32, mesuré le 2026-11-02) ; `small` (rapide, CPU), `turbo` (plus précis), `large-v3` (GPU) |
 | `VOICE_WHISPER_DEVICE` / `VOICE_WHISPER_COMPUTE` | `cpu` / `int8` | `cuda` / `float16` avec un GPU |
-| `VOICE_WHISPER_BEAM` | `5` | précision de la transcription ; `1` ≈ 20 % plus rapide mais déforme des lieux |
+| `VOICE_WHISPER_BEAM` | `5` | précision de Whisper ; `1` ne fait gagner que 0,4 à 1,3 s et peut boucler (26 s mesurées le 25/10) |
+| `VOICE_WHISPER_TEMPERATURE` | `0` | une seule température : Whisper ne relance plus le décodage sur une phrase douteuse (cause des 23 et 26 s) |
+| `VOICE_WHISPER_TOKENS_PER_S` | `8` | plafond de jetons par seconde d'audio (+ 16) ; une boucle est coupée, et Parakeet est gardé si Whisper boucle ou ne rend rien |
+| `VOICE_LLM_URL` | vide | adresse de llama-server (Ministral 3 3B) ; vide = pas de LLM. `npm run dev:stack` le lance (port 8300) si `services/models/llm/` le contient ; `SIRA_LLM=false` le coupe |
+| `VOICE_LLM_TIMEOUT_S` | `20` | au-delà, la voix répond avec ses règles habituelles |
+| `VOICE_ASR` | `hybride` | `hybride` : Parakeet d'abord, Whisper si le lieu ou l'intention ne sont pas sûrs ; `whisper` : Whisper seul |
+| `VOICE_PARAKEET_DIR` | `services/models/voice/parakeet-tdt-0.6b-v3-int8` | modèle Parakeet ; absent, le service utilise Whisper seul |
 | `VOICE_SPEECH_RATE` | `1.1` | vitesse de la voix de SIRA (`1.0` = voix d'origine) |
+| `VOICE_NOISE_SCALE` / `VOICE_NOISE_W` | `0.5` / `0.6` | intonation de Piper : plus bas = plus régulier (choisi à l'écoute le 2026-10-25 ; valeurs du modèle `0.667` / `0.8`) |
+| `VOICE_AUDIO_FORMAT` | `mp3` | voix envoyée à l'appli : `mp3` (≈ 9 fois plus léger, arrive vite en 3G) ou `wav` |
+| `VOICE_AUDIO_BITRATE` | `40000` | débit du MP3 en bits/s |
 | `VOICE_PRELOAD` | `1` | Whisper et Piper chargés dès le démarrage (sinon la 1re phrase attend 10 à 20 s) |
-| `VOICE_PIPER_MODEL` | `services/models/voice/piper/fr_FR-siwis-medium.onnx` | voix de SIRA (future voix ivoirienne : remplacer ce fichier) |
+| `VOICE_PIPER_MODEL` | `services/models/voice/piper/fr_FR-upmc-medium.onnx` | la voix de SIRA, « pierre » (future voix ivoirienne : remplacer ce fichier) |
+| `VOICE_PIPER_SPEAKER` | `1` | locuteur dans le modèle (upmc : `1` = pierre ; vide pour un modèle à une seule voix) |
 | `SIRA_API_URL` | `http://127.0.0.1:4000/api/v1` | API de calcul des trajets |
-| `VOICE_PLACE_THRESHOLD` / `VOICE_PLACE_MARGIN` | `60` / `3` | seuils du correcteur de lieux |
+| `VOICE_PLACE_THRESHOLD` / `VOICE_PLACE_MARGIN` | `90` / `3` | seuils du correcteur de lieux : en dessous de 90, SIRA demande « Tu veux dire … ? » |
 
 ## Scores mesurés (test v0.4 — phrases synthétiques jamais vues)
 
@@ -139,6 +185,47 @@ Si `reply_audio` est vide (Piper non installé), lire `reply_text` avec la voix 
 | Entités (F1) | 97,1 % | 94,6 % |
 | Lieux : exact → correcteur | 99,1 % | 46,2 % → 97,5 % |
 | Destination juste, de bout en bout | 92,8 % | 91,0 % |
+
+## Mesurer sur de vraies voix
+
+Les 40 phrases de test (`outils/phrases_test_voix.csv`, colonnes `fichier;texte;lieu`) sont **l'examen** : elles ne
+servent jamais à entraîner, sinon les progrès mesurés seraient faux.
+
+1. Ouvrir `outils/enregistreur_simple.html` dans un navigateur (téléphone ou PC) : une phrase, un bouton ; tout reste
+   dans le navigateur. Exporter le ZIP `SIRA_test_voix_<prénom>_<date>.zip` (T01.wav… + `attendu.csv`).
+2. `npm run voice:import -- --bench` : range chaque nouveau ZIP (du dossier de dépôt `enregistrements/a_ranger/`, où
+   l'on peut enregistrer ou glisser les ZIP, et de Téléchargements) dans `services/voice/enregistrements/`
+   (**hors Git** : voix de vraies personnes), puis mesure Whisper dessus. Sans `--bench`, range seulement ; pour
+   remesurer un dossier déjà importé : `npm run voice:bench -- --audio services/voice/enregistrements/<dossier>`.
+3. Le rapport (`rapport.md`, `resultats.csv`, `machine.json`) est écrit dans `benchmarks/<date>_<machine>/`, dans Git,
+   pour comparer les réglages et les machines sur les mêmes phrases.
+
+**Référence du 2026-10-19** (`benchmarks/2026-10-19_1928_DESKTOP-FJCLIQK/`, une seule voix, PC sans carte NVIDIA) :
+Whisper `small`, beam 5 → erreur de mots **19,1 %**, bon lieu **26/32**, ≈ 7,4 s d'attente par phrase. Les 6 lieux
+ratés sont des mots mal entendus par Whisper (Angré → « engager », CHU → « au-dessus », Zone 4 → « Zonkat »,
+aéroport → « la repos ») ou une phrase incompréhensible ; les compléments du répertoire de lieux n'y changent rien
+(26/32 aussi en repassant les mêmes transcriptions). La marge de progrès est donc du côté de la transcription.
+
+## Enregistrer pour entraîner
+
+La liste d'entraînement (`outils/phrases_entrainement_voix.csv`, 275 phrases, ≈ 21 min par personne) est générée par
+`outils/generer_phrases_entrainement.py` : les lieux ratés par Whisper et les grands lieux, les quartiers aux noms non
+français, le vocabulaire du trajet, l'argent et le parler d'Abidjan, chaque lieu au moins 3 fois, avec l'article qu'on
+dit (« au Plateau », « à l'aéroport »). Lieux vérifiés par le correcteur, mots tirés du lexique fr-CI ; aucune phrase
+d'examen. Plus il y a de voix différentes (hommes, femmes, âges, accents, rue bruyante), mieux c'est, et **pas les
+mêmes personnes que l'examen** (sinon l'examen mesure des voix déjà entendues). Minimum : 3 personnes pour l'examen,
+10 autres pour l'entraînement.
+
+**Une seule page, trois onglets** (`outils/enregistreur_simple.html`) :
+
+| Onglet | Phrases | Pour | Qui | ZIP rangé par `npm run voice:import` dans |
+|---|---|---|---|---|
+| Examen | 40 | mesurer Whisper (`--bench`) | plusieurs personnes | `enregistrements/test/` |
+| Entraînement | 275 | entraîner Whisper (puis CamemBERT) | d'autres personnes | `enregistrements/entrainement/` |
+| Voix de SIRA | 628 (`script_voix.csv`) | entraîner Piper | **une seule** personne, au calme | `enregistrements/piper/` (wavs/ + metadata.csv) |
+
+`generer_phrases_entrainement.py` recopie les listes d'entraînement et de Piper dans la page. Un dossier Piper se
+prépare ensuite avec `outils/piper_dataset.py preparer --entree enregistrements/piper/<dossier> --sortie dataset_piper/`.
 
 ## FAQ et questions sur le trajet (`knowledge/`)
 
@@ -158,15 +245,16 @@ Les questions qui ne sont pas des demandes de trajet (« c'est quoi un gbaka ? �
 
 ## Limites à connaître
 
-- Données d'entraînement **100 % synthétiques** ; bruit ASR **simulé** : scores à re-mesurer sur de vraies voix.
+- Données d'entraînement **100 % synthétiques** ; bruit ASR **simulé** : une seule vraie voix mesurée pour l'instant
+  (voir « Mesurer sur de vraies voix »), à confirmer avec d'autres personnes.
 - Intentions encore fragiles : `find_stop`, `ask_nearby_landmark`, `avoid_traffic`, `out_of_scope` (dataset v0.5).
-- Voix française (Piper siwis) en attendant une voix ivoirienne enregistrée avec consentement.
+- Voix française (Piper « pierre ») en attendant une voix ivoirienne enregistrée avec consentement.
 - **Aucun audio n'est conservé** : la collecte de voix demandera un consentement explicite (loi n° 2013-450, ARTCI).
 - Signalements (« y a accident vers Koumassi ») : le service prépare le signalement, l'app le fait confirmer à l'usager.
 
 ## Tests
 
 ```bash
-npm run test:voice                         # 58 tests (dont FAQ et trajet en cours), sans les gros modèles
+npm run test:voice                         # 64 tests (dont FAQ, trajet en cours, compléments de lieux), sans les gros modèles
 npm --prefix services/api test             # dont le relais /api/v1/voice
 ```

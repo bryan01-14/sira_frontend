@@ -2,25 +2,22 @@ import React, { useState } from 'react';
 import {
   StyleSheet,
   View,
-  Text,
   TouchableOpacity,
   ScrollView,
   SafeAreaView,
-  Dimensions,
   Platform,
-  Alert,
 } from 'react-native';
-import { Image } from 'expo-image';
+import { Text } from '@/components/sira-text';
+import { ProfileAvatar } from '@/components/profile-avatar';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { DeleteAccountModal } from '@/components/delete-account-modal';
+import { LogoutModal } from '@/components/logout-modal';
+import { ACCOUNT_LINKS } from '@/lib/account-links';
 import { ProfilePhotoModal } from '@/components/profile-photo-modal';
 import { CustomBottomTabBar, useTabBarSpace } from '@/components/custom-bottom-tab-bar';
 import { useSession } from '@/lib/session';
-import { goBack } from '@/lib/navigation';
-
-const { width } = Dimensions.get('window');
 
 interface MenuItem {
   id: string;
@@ -37,55 +34,31 @@ export default function ProfileScreen() {
   const router = useRouter();
 
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+  // Camera, photos or an avatar: handled by the « Photo de profil » window itself.
   const [showProfilePhotoModal, setShowProfilePhotoModal] = useState(false);
 
-  const handleDeleteAccount = () => {
-    setShowDeleteModal(true);
-  };
-
-  const handleSelectCamera = () => {
-    Alert.alert('Caméra', 'Ouvrir l’appareil photo...');
-  };
-
-  const handleSelectGallery = () => {
-    Alert.alert('Galérie', 'Ouvrir la galerie photos...');
-  };
-
-  const handleSelectAvatar = () => {
-    Alert.alert('Avatar', 'Sélectionner un avatar...');
-  };
-
+  // The same pages as the side menu (lib/account-links.ts), then the account itself:
+  // signing out, and deleting it (here only, confirmed first).
   const menuItems: MenuItem[] = [
+    ...ACCOUNT_LINKS.flat().map((link) => ({
+      id: link.id,
+      title: link.title,
+      iconName: link.icon,
+      onPress: () => router.push(link.href),
+    })),
     {
-      id: 'favorites',
-      title: 'Mes favories',
-      iconName: 'heart',
-      onPress: () => router.push('/favorites'),
-    },
-    {
-      id: 'location',
-      title: 'Ma position',
-      iconName: 'location',
-      onPress: () => router.push('/location-settings'),
-    },
-    {
-      id: 'chat',
-      title: 'Discuter avec SIRA',
-      iconName: 'hardware-chip-outline',
-      onPress: () => router.push('/chat'),
-    },
-    {
-      id: 'privacy',
-      title: 'Confidentialité',
-      iconName: 'lock-closed',
-      onPress: () => router.push('/privacy'),
+      id: 'logout',
+      title: 'Se déconnecter',
+      iconName: 'log-out-outline',
+      onPress: () => setShowLogoutModal(true),
     },
     {
       id: 'delete',
       title: 'Supprimer mon compte',
       iconName: 'trash',
       isDestructive: true,
-      onPress: handleDeleteAccount,
+      onPress: () => setShowDeleteModal(true),
     },
   ];
 
@@ -94,18 +67,6 @@ export default function ProfileScreen() {
       <StatusBar style="light" />
 
       <View style={styles.container}>
-        {/* Top Header Bar */}
-        <View style={styles.headerContainer}>
-          <TouchableOpacity
-            style={styles.closeButtonCircle}
-            onPress={() => goBack(router)}
-            activeOpacity={0.8}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          >
-            <Ionicons name="close" size={20} color="#000000" />
-          </TouchableOpacity>
-        </View>
-
         <ScrollView
           style={styles.scrollView}
           contentContainerStyle={[styles.scrollContent, { paddingBottom: tabBarSpace }]}
@@ -118,11 +79,7 @@ export default function ProfileScreen() {
               activeOpacity={0.85}
               onPress={() => setShowProfilePhotoModal(true)}
             >
-              <Image
-                source={require('@/assets/images/sira-character-assistant.png')}
-                style={styles.avatarImage}
-                contentFit="cover"
-              />
+              <ProfileAvatar size={112} />
               <TouchableOpacity
                 style={styles.cameraBadge}
                 activeOpacity={0.8}
@@ -211,19 +168,26 @@ export default function ProfileScreen() {
       {/* Bottom Navigation Bar with Active Profile Tab */}
       <CustomBottomTabBar activeTab="profile" />
 
-      {/* Logout Confirmation Modal */}
+      {/* Account deletion, confirmed first (also in Confidentialité) */}
       <DeleteAccountModal
         visible={showDeleteModal}
         onClose={() => setShowDeleteModal(false)}
       />
 
-      {/* Profile Photo Edit Modal */}
+      {/* Signing out, confirmed first (as in the side menu) */}
+      <LogoutModal
+        visible={showLogoutModal}
+        onClose={() => setShowLogoutModal(false)}
+        onConfirm={() => {
+          setShowLogoutModal(false);
+          router.replace('/login');
+        }}
+      />
+
+      {/* « Photo de profil »: camera, photos or one of SIRA's avatars */}
       <ProfilePhotoModal
         visible={showProfilePhotoModal}
         onClose={() => setShowProfilePhotoModal(false)}
-        onSelectCamera={handleSelectCamera}
-        onSelectGallery={handleSelectGallery}
-        onSelectAvatar={handleSelectAvatar}
       />
     </SafeAreaView>
   );
@@ -238,21 +202,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#000000',
   },
-  headerContainer: {
-    paddingHorizontal: 20,
-    paddingTop: 14,
-    paddingBottom: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  closeButtonCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#F26522',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
   scrollView: {
     flex: 1,
   },
@@ -263,7 +212,7 @@ const styles = StyleSheet.create({
   },
   avatarSection: {
     alignItems: 'center',
-    marginTop: 10,
+    marginTop: 28,
   },
   avatarRing: {
     width: 120,

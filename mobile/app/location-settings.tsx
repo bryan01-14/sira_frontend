@@ -5,12 +5,12 @@ import React, { useEffect } from 'react';
 import {
   StyleSheet,
   View,
-  Text,
   TouchableOpacity,
   ScrollView,
   Dimensions,
   Platform,
 } from 'react-native';
+import { Text } from '@/components/sira-text';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -40,7 +40,7 @@ export default function LocationSettingsScreen() {
     <View style={styles.container}>
       <StatusBar style="dark" />
 
-      <SafeAreaView style={styles.safeArea} edges={['top']}>
+      <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
         {/* Top Header Bar */}
         <View style={styles.headerBar}>
           <TouchableOpacity

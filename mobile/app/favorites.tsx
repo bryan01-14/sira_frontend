@@ -2,108 +2,97 @@ import React, { useState, useMemo } from 'react';
 import {
   StyleSheet,
   View,
-  Text,
   TouchableOpacity,
   FlatList,
-  TextInput,
   Modal,
   Platform,
-  Alert,
+  Share,
 } from 'react-native';
+import { Text, TextInput, useFocusFrame } from '@/components/sira-text';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useFavorites, FavoriteRoute } from '@/hooks/use-favorites';
 import { CustomBottomTabBar, useTabBarSpace } from '@/components/custom-bottom-tab-bar';
+import { removeFavoriteTrip, searchFavorites, useFavorites, type FavoriteRecord } from '@/lib/favorites';
+import { formatDuration, formatPrice } from '@/lib/journey-format';
 import { goBack } from '@/lib/navigation';
+import { notify } from '@/lib/notify';
+import { rememberPlace } from '@/lib/places';
+import { CATEGORY_NAMES, tripTitle } from '@/lib/trip-history';
+
+// The traveller's favourite trips, kept on the phone (lib/favorites.ts). Figures are SIRA-MORE's estimate
+// when the trip was added; « Y aller » computes the journeys again for now.
+const option = (item: FavoriteRecord) => (item.category ? CATEGORY_NAMES[item.category] : 'Autre trajet');
 
 export default function FavoritesScreen() {
   // The list ends above the bottom bar (its last item stays reachable on small phones).
   const tabBarSpace = useTabBarSpace();
   const router = useRouter();
-  const { favorites, removeFavorite } = useFavorites();
+  // The search bar's frame turns orange while one types in it.
+  const searchFocus = useFocusFrame();
+  const favorites = useFavorites();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
-  const [selectedItem, setSelectedItem] = useState<FavoriteRoute | null>(null);
+  const [selectedItem, setSelectedItem] = useState<FavoriteRecord | null>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
-  const filteredFavorites = useMemo(() => {
-    if (!searchQuery.trim()) return favorites;
-    const q = searchQuery.toLowerCase();
-    return favorites.filter(
-      (item) =>
-        item.title.toLowerCase().includes(q) ||
-        item.transport.toLowerCase().includes(q) ||
-        item.mode.toLowerCase().includes(q) ||
-        item.departure.toLowerCase().includes(q) ||
-        item.arrival.toLowerCase().includes(q)
-    );
-  }, [favorites, searchQuery]);
+  const filteredFavorites = useMemo(() => searchFavorites(favorites, searchQuery), [favorites, searchQuery]);
 
-  const handleOpenDetail = (item: FavoriteRoute) => {
-    router.push({
-      pathname: '/route-detail',
-      params: {
-        departure: item.departure,
-        arrival: item.arrival,
-        mode: item.mode,
-        suboption: item.transport,
-        costRange: item.costRange,
-        durationMinutes: item.duration.replace(' min', ''),
-      },
-    });
+  // Same departure and arrival, journeys computed again for now (prices and lines may have changed).
+  const goThere = (item: FavoriteRecord) => {
+    rememberPlace(item.from.name, { latitude: item.from.latitude, longitude: item.from.longitude });
+    rememberPlace(item.to.name, { latitude: item.to.latitude, longitude: item.to.longitude });
+    router.push({ pathname: '/(tabs)/explore', params: { destination: item.to.name, query: item.to.name, from: item.from.name } });
   };
 
-  const handleOpenMenu = (item: FavoriteRoute) => {
+  const handleOpenMenu = (item: FavoriteRecord) => {
     setSelectedItem(item);
     setIsMenuOpen(true);
   };
 
-  const handleRemove = (item: FavoriteRoute) => {
-    Alert.alert(
-      'Retirer des favoris',
-      `Tu veux retirer le trajet "${item.title}" de tes favoris ?`,
-      [
-        { text: 'Annuler', style: 'cancel' },
-        {
-          text: 'Retirer',
-          style: 'destructive',
-          onPress: () => removeFavorite(item.id),
-        },
-      ]
-    );
-  };
-
-  const handleRepeatRoute = () => {
-    if (selectedItem) {
-      handleOpenDetail(selectedItem);
-    }
+  const closeMenu = () => {
     setIsMenuOpen(false);
     setSelectedItem(null);
+  };
+
+  const handleRemove = (item: FavoriteRecord) => notify(
+    'Retirer des favoris',
+    `Tu veux retirer le trajet « ${tripTitle(item)} » de tes favoris ?`,
+    [
+      { text: 'Retirer', onPress: () => removeFavoriteTrip(item.id) },
+      { text: 'Annuler', onPress: () => {} },
+    ],
+  );
+
+  const handleGoFromMenu = () => {
+    const item = selectedItem;
+    closeMenu();
+    if (item) goThere(item);
   };
 
   const handleRemoveFromMenu = () => {
-    if (selectedItem) {
-      removeFavorite(selectedItem.id);
-    }
-    setIsMenuOpen(false);
-    setSelectedItem(null);
+    if (selectedItem) removeFavoriteTrip(selectedItem.id);
+    closeMenu();
   };
 
-  const handleShareRoute = () => {
-    if (selectedItem) {
-      Alert.alert('Partager', `Lien de partage généré pour le trajet "${selectedItem.title}".`);
+  // The phone's own sharing (WhatsApp, SMS…), with the trip in words.
+  const handleShareRoute = async () => {
+    const item = selectedItem;
+    closeMenu();
+    if (!item) return;
+    try {
+      await Share.share({ message: `Mon trajet SIRA : ${item.from.name} → ${item.to.name}. ${item.transport}, ${formatDuration(item.durationMin)}, ${formatPrice(item.priceF)}.` });
+    } catch {
+      notify('Partage impossible', 'Ce téléphone ne permet pas de partager depuis ici.');
     }
-    setIsMenuOpen(false);
-    setSelectedItem(null);
   };
 
   return (
     <View style={styles.container}>
-      <StatusBar style="dark" />
+      <StatusBar style="light" />
 
       {/* Map Pattern Overlay Background */}
       <Image
@@ -121,8 +110,9 @@ export default function FavoritesScreen() {
             onPress={() => goBack(router)}
             activeOpacity={0.8}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            accessibilityLabel="Retour"
           >
-            <Ionicons name="arrow-back" size={20} color="#FFFFFF" />
+            <Ionicons name="arrow-back" size={20} color="#000000" />
           </TouchableOpacity>
 
           <Text style={styles.headerTitle}>Mes favoris</Text>
@@ -135,22 +125,24 @@ export default function FavoritesScreen() {
             }}
             activeOpacity={0.7}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            accessibilityLabel={isSearching ? 'Fermer la recherche' : 'Rechercher un favori'}
           >
             <Ionicons
               name={isSearching ? 'close' : 'search'}
               size={22}
-              color="#000000"
+              color="#FFFFFF"
             />
           </TouchableOpacity>
         </View>
 
         {/* Expandable Search Input Bar */}
         {isSearching && (
-          <View style={styles.searchBarContainer}>
-            <Ionicons name="search" size={18} color="#64748B" style={styles.searchIcon} />
+          <View style={[styles.searchBarContainer, searchFocus.frameStyle]}>
+            <Ionicons name="search" size={18} color="#9CA3AF" style={styles.searchIcon} />
             <TextInput
+              {...searchFocus.inputProps}
               style={styles.searchInput}
-              placeholder="Rechercher un trajet favori..."
+              placeholder="Lieu, option ou transport…"
               placeholderTextColor="#94A3B8"
               value={searchQuery}
               onChangeText={setSearchQuery}
@@ -172,12 +164,12 @@ export default function FavoritesScreen() {
           showsVerticalScrollIndicator={false}
           ListEmptyComponent={
             <View style={styles.emptyStateContainer}>
-              <Ionicons name="heart-dislike-outline" size={56} color="#CBD5E1" />
-              <Text style={styles.emptyStateTitle}>Aucun favori enregistré</Text>
+              <Ionicons name={searchQuery ? 'search-outline' : 'bookmark-outline'} size={56} color="#4B5563" />
+              <Text style={styles.emptyStateTitle}>{searchQuery ? 'Aucun favori trouvé' : 'Pas encore de favori'}</Text>
               <Text style={styles.emptyStateSubtitle}>
                 {searchQuery
-                  ? 'Aucun résultat ne correspond à ta recherche.'
-                  : 'Ajoute tes trajets réguliers en favoris depuis l’historique ou le détail des trajets pour les retrouver ici à tout moment.'}
+                  ? 'Aucun favori ne correspond à ta recherche.'
+                  : 'Touche le signet dans le détail d’un trajet, ou « Ajouter aux favoris » dans ton historique : il sera ici, prêt à refaire en un geste.'}
               </Text>
             </View>
           }
@@ -194,9 +186,8 @@ export default function FavoritesScreen() {
                   />
                 </View>
 
-                {/* Title (Slightly reduced font size) */}
                 <Text style={styles.cardTitle} numberOfLines={2}>
-                  {item.title}
+                  {tripTitle(item)}
                 </Text>
 
                 {/* Right Action Icons (Heart + Three Dots) */}
@@ -206,6 +197,7 @@ export default function FavoritesScreen() {
                     onPress={() => handleRemove(item)}
                     activeOpacity={0.7}
                     hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
+                    accessibilityLabel="Retirer des favoris"
                   >
                     <Ionicons name="heart" size={22} color="#F26522" />
                   </TouchableOpacity>
@@ -215,46 +207,44 @@ export default function FavoritesScreen() {
                     onPress={() => handleOpenMenu(item)}
                     activeOpacity={0.7}
                     hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
+                    accessibilityLabel="Plus d’options"
                   >
-                    <Ionicons name="ellipsis-vertical" size={20} color="#000000" />
+                    <Ionicons name="ellipsis-vertical" size={20} color="#FFFFFF" />
                   </TouchableOpacity>
                 </View>
               </View>
 
-              {/* Card Meta Details (Reduced font sizes for clean fit) */}
+              {/* Card Meta Details */}
               <View style={styles.detailsContainer}>
-                {/* Row 1: Option & Transport */}
                 <Text style={styles.detailsLine}>
                   <Text style={styles.labelSpan}>Option : </Text>
-                  <Text style={styles.valueSpan}>{item.mode}</Text>
+                  <Text style={styles.valueSpan}>{option(item)}</Text>
                   <Text style={styles.spacerSpan}>    </Text>
                   <Text style={styles.labelSpan}>Transport : </Text>
                   <Text style={styles.valueSpan}>{item.transport}</Text>
                 </Text>
 
-                {/* Row 2: Durée */}
                 <Text style={styles.detailsLine}>
                   <Text style={styles.labelSpan}>Durée : </Text>
-                  <Text style={styles.valueSpan}>{item.duration}</Text>
+                  <Text style={styles.valueSpan}>{formatDuration(item.durationMin)}</Text>
                 </Text>
 
-                {/* Row 3: Coût */}
                 <Text style={styles.detailsLine}>
-                  <Text style={styles.labelSpan}>Coût : </Text>
-                  <Text style={styles.valueSpan}>{item.costRange}</Text>
+                  <Text style={styles.labelSpan}>Coût estimé : </Text>
+                  <Text style={styles.valueSpan}>{formatPrice(item.priceF)}</Text>
                 </Text>
               </View>
 
-              {/* Action Button: Détail du trajet */}
+              {/* Action Button: same trip, journeys computed for now */}
               <TouchableOpacity
                 style={styles.detailButton}
-                onPress={() => handleOpenDetail(item)}
+                onPress={() => goThere(item)}
                 activeOpacity={0.85}
               >
                 <View style={styles.plusIconCircle}>
-                  <Ionicons name="add" size={13} color="#F26522" />
+                  <Ionicons name="navigate" size={12} color="#F26522" />
                 </View>
-                <Text style={styles.detailButtonText}>Détail du trajet</Text>
+                <Text style={styles.detailButtonText}>Y aller</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -266,33 +256,32 @@ export default function FavoritesScreen() {
         visible={isMenuOpen}
         transparent
         animationType="fade"
-        onRequestClose={() => setIsMenuOpen(false)}
+        onRequestClose={closeMenu}
       >
         <TouchableOpacity
           style={styles.modalOverlay}
           activeOpacity={1}
-          onPress={() => setIsMenuOpen(false)}
+          onPress={closeMenu}
         >
           <TouchableOpacity
             activeOpacity={1}
             style={styles.blackMenuCard}
             onPress={(e) => e.stopPropagation()}
           >
-            {/* Top Right Orange Close Button */}
             <TouchableOpacity
               style={styles.closeOrangeBtn}
-              onPress={() => setIsMenuOpen(false)}
+              onPress={closeMenu}
               activeOpacity={0.8}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityLabel="Fermer"
             >
               <Ionicons name="close" size={14} color="#000000" />
             </TouchableOpacity>
 
             <View style={styles.menuItemsList}>
-              {/* Option 1: Refaire ce trajet */}
               <TouchableOpacity
                 style={styles.menuOptionRow}
-                onPress={handleRepeatRoute}
+                onPress={handleGoFromMenu}
                 activeOpacity={0.7}
               >
                 <View style={styles.darkIconCircle}>
@@ -301,19 +290,6 @@ export default function FavoritesScreen() {
                 <Text style={styles.menuOptionText}>Refaire ce trajet</Text>
               </TouchableOpacity>
 
-              {/* Option 2: Retirer des favoris */}
-              <TouchableOpacity
-                style={styles.menuOptionRow}
-                onPress={handleRemoveFromMenu}
-                activeOpacity={0.7}
-              >
-                <View style={styles.darkIconCircle}>
-                  <Ionicons name="heart-dislike-outline" size={18} color="#F26522" />
-                </View>
-                <Text style={styles.menuOptionText}>Retirer des favoris</Text>
-              </TouchableOpacity>
-
-              {/* Option 3: Partager ce trajet */}
               <TouchableOpacity
                 style={styles.menuOptionRow}
                 onPress={handleShareRoute}
@@ -325,16 +301,15 @@ export default function FavoritesScreen() {
                 <Text style={styles.menuOptionText}>Partager ce trajet</Text>
               </TouchableOpacity>
 
-              {/* Option 4: Supprimer */}
               <TouchableOpacity
                 style={styles.menuOptionRow}
                 onPress={handleRemoveFromMenu}
                 activeOpacity={0.7}
               >
                 <View style={styles.darkIconCircle}>
-                  <Ionicons name="trash-outline" size={18} color="#F26522" />
+                  <Ionicons name="heart-dislike-outline" size={18} color="#F26522" />
                 </View>
-                <Text style={styles.menuOptionText}>Supprimer des favoris</Text>
+                <Text style={styles.menuOptionText}>Retirer des favoris</Text>
               </TouchableOpacity>
             </View>
           </TouchableOpacity>
@@ -350,10 +325,10 @@ export default function FavoritesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F6F8',
+    backgroundColor: '#000000',
   },
   lightOverlay: {
-    backgroundColor: 'rgba(245, 246, 248, 0.93)',
+    backgroundColor: 'rgba(0, 0, 0, 0.9)',
   },
   safeArea: {
     flex: 1,
@@ -370,7 +345,7 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: '#1E1E1E',
+    backgroundColor: '#F26522',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -384,20 +359,20 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 22,
     fontWeight: '800',
-    color: '#000000',
+    color: '#FFFFFF',
     letterSpacing: -0.3,
   },
   searchBarContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#1E1E1E',
     marginHorizontal: 16,
     marginBottom: 12,
     paddingHorizontal: 12,
     height: 44,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: 'rgba(255,255,255,0.06)',
     ...Platform.select({
       ios: {
         shadowColor: '#000',
@@ -416,7 +391,7 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     fontSize: 14,
-    color: '#0F172A',
+    color: '#FFFFFF',
   },
   listContent: {
     paddingHorizontal: 16,
@@ -424,10 +399,10 @@ const styles = StyleSheet.create({
     paddingBottom: 100,
   },
   card: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#1E1E1E',
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: 'rgba(255,255,255,0.06)',
     padding: 14,
     marginBottom: 12,
     ...Platform.select({
@@ -464,7 +439,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 13,
     fontWeight: '800',
-    color: '#000000',
+    color: '#FFFFFF',
     marginLeft: 8,
     marginRight: 4,
     lineHeight: 17,
@@ -486,18 +461,18 @@ const styles = StyleSheet.create({
   },
   detailsLine: {
     fontSize: 11.5,
-    color: '#475569',
+    color: '#BBBBBB',
     marginBottom: 2,
     lineHeight: 16,
   },
   labelSpan: {
     fontWeight: '400',
-    color: '#475569',
+    color: '#9CA3AF',
     fontSize: 11.5,
   },
   valueSpan: {
     fontWeight: '800',
-    color: '#000000',
+    color: '#FFFFFF',
     fontSize: 11.5,
   },
   spacerSpan: {
@@ -535,24 +510,24 @@ const styles = StyleSheet.create({
   emptyStateTitle: {
     fontSize: 17,
     fontWeight: '700',
-    color: '#334155',
+    color: '#FFFFFF',
     marginTop: 12,
     marginBottom: 6,
   },
   emptyStateSubtitle: {
     fontSize: 13,
-    color: '#64748B',
+    color: '#BBBBBB',
     textAlign: 'center',
     lineHeight: 18,
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
     justifyContent: 'flex-end',
   },
   blackMenuCard: {
     width: '100%',
-    backgroundColor: '#000000',
+    backgroundColor: '#1E1E1E',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingHorizontal: 20,

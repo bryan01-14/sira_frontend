@@ -2,17 +2,17 @@ import React from 'react';
 import {
   StyleSheet,
   View,
-  Text,
   TouchableOpacity,
   ScrollView,
   SafeAreaView,
-  TextInput,
 } from 'react-native';
+import { Text } from '@/components/sira-text';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { CustomBottomTabBar, useTabBarSpace } from '@/components/custom-bottom-tab-bar';
 import { goBack } from '@/lib/navigation';
+import { useVoiceMode, VOICE_MODE_ICONS, VOICE_MODE_LABELS } from '@/lib/voice';
 
 interface SettingItem {
   id: string;
@@ -26,40 +26,30 @@ export default function SettingsScreen() {
   // The list ends above the bottom bar (its last item stays reachable on small phones).
   const tabBarSpace = useTabBarSpace();
   const router = useRouter();
+  const voiceMode = useVoiceMode();
 
+  // How SIRA behaves (the traveller's own things and the chat with SIRA are in the Profil).
+  // Notifications and Apparence come back here once they really work.
   const settingsList: SettingItem[] = [
     {
-      id: 'account',
-      title: 'Compte',
-      subtitle: 'Modifier le nom et le numéro de téléphone',
-      iconName: 'person',
-      onPress: () => router.push('/edit-profile'),
+      // SIRA starts silent: the traveller turns its voice on here.
+      id: 'voice',
+      title: 'Voix de SIRA',
+      subtitle: VOICE_MODE_LABELS[voiceMode],
+      iconName: VOICE_MODE_ICONS[voiceMode],
+      onPress: () => router.push('/voice-settings'),
     },
     {
-      id: 'notifications',
-      title: 'Notifications',
-      subtitle: 'Alertes trafic, itinéraire et zones suivies',
-      iconName: 'notifications',
-      onPress: () => router.push('/notification-settings'),
-    },
-    {
-      id: 'location',
-      title: 'Localisation',
-      subtitle: 'Gérer l’accès à ta position',
-      iconName: 'location',
-      onPress: () => router.push('/location-settings'),
-    },
-    {
-      id: 'appearance',
-      title: 'Apparence',
-      subtitle: 'Thème et affichage de l’application',
-      iconName: 'color-palette',
-      onPress: () => router.push('/appearance-settings'),
+      id: 'permissions',
+      title: 'Autorisations',
+      subtitle: 'Position et micro : ce que SIRA utilise',
+      iconName: 'shield-checkmark',
+      onPress: () => router.push('/permissions'),
     },
     {
       id: 'privacy',
-      title: 'Confidentialité et sécurité',
-      subtitle: 'Données personnelles et sécurité du compte',
+      title: 'Confidentialité',
+      subtitle: 'Ce que SIRA garde sur toi, et ce qu’il ne garde pas',
       iconName: 'lock-closed',
       onPress: () => router.push('/privacy'),
     },
@@ -74,7 +64,7 @@ export default function SettingsScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar style="dark" />
+      <StatusBar style="light" />
 
       <View style={styles.container}>
         {/* Top Header Bar */}
@@ -85,7 +75,7 @@ export default function SettingsScreen() {
             activeOpacity={0.7}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            <Ionicons name="arrow-back" size={24} color="#000000" />
+            <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
           </TouchableOpacity>
 
           <Text style={styles.headerTitle}>Paramètres</Text>
@@ -96,7 +86,7 @@ export default function SettingsScreen() {
             activeOpacity={0.7}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            <Ionicons name="search" size={24} color="#000000" />
+            <Ionicons name="search" size={24} color="#FFFFFF" />
           </TouchableOpacity>
         </View>
 
@@ -142,11 +132,11 @@ export default function SettingsScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#000000',
   },
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#000000',
   },
   headerContainer: {
     paddingHorizontal: 20,
@@ -155,12 +145,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#000000',
   },
   headerTitle: {
     fontSize: 22,
     fontWeight: '800',
-    color: '#000000',
+    color: '#FFFFFF',
     letterSpacing: 0.2,
   },
   headerIconButton: {
@@ -180,10 +170,10 @@ const styles = StyleSheet.create({
   settingCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#1E1E1E',
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#ECECEC',
+    borderColor: 'rgba(255,255,255,0.06)',
     padding: 14,
     marginBottom: 12,
     shadowColor: '#000000',
@@ -208,13 +198,13 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: 16,
     fontWeight: '800',
-    color: '#000000',
+    color: '#FFFFFF',
     marginBottom: 2,
   },
   cardSubtitle: {
     fontSize: 12.5,
     fontWeight: '400',
-    color: '#666666',
+    color: '#BBBBBB',
     lineHeight: 16,
   },
   actionChevron: {

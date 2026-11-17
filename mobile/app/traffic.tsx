@@ -1,26 +1,30 @@
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import {
   StyleSheet,
   View,
-  Text,
   TouchableOpacity,
-  TextInput,
   Modal,
   Dimensions,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
+import { Text, TextInput, useFocusFrame } from '@/components/sira-text';
 import { Image } from 'expo-image';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { CustomBottomTabBar } from '@/components/custom-bottom-tab-bar';
+import { CustomBottomTabBar, useTabBarSpace } from '@/components/custom-bottom-tab-bar';
 import { OsmMapView } from '@/components/osm-map-view';
+import { FollowZoneButton } from '@/components/follow-zone-button';
 import { notify } from '@/lib/notify';
+import { showSuccess } from '@/components/success-card';
+import { confirmationsLabel, OPINION_LABEL, opinionFor, rememberReportOpinion, useReportOpinions } from '@/lib/report-opinions';
 import { voteReport, type TrafficReport } from '@/lib/sira-api';
-import { REPORT_STATUS_LABEL, REPORT_STYLE, clientId, timeAgo, upsertReport, useLiveReports } from '@/lib/reports';
-import { formatClock } from '@/lib/journey-format';
+import { REPORT_STATUS_LABEL, REPORT_STYLE, timeAgo, upsertReport, useLiveReports, alertBadge, useAlertCount } from '@/lib/reports';
+import { formatClock, formatDistance } from '@/lib/journey-format';
 import { goBack } from '@/lib/navigation';
+import { ensureCurrentPlace, isApproximate, useCurrentPlace } from '@/lib/places';
 
 const { width, height } = Dimensions.get('window');
 
@@ -32,16 +36,58 @@ const PANEL_TYPES: Record<string, string[]> = {
   inondation: ['flood'],
   autre: ['road_damage', 'breakdown', 'transport', 'other'],
 };
+const PANEL_LABELS: Record<string, string> = {
+  accident: 'Accidents', embouteillage: 'Bouchons', route_bloquee: 'Routes bloquées', inondation: 'Inondations', autre: 'Autres incidents',
+};
 
 export default function TrafficScreen() {
   const router = useRouter();
+  // The search bar's frame turns orange while one types in it.
+  const searchFocus = useFocusFrame();
+  // The filters float just above the bottom bar and its raised circle.
+  const tabBarSpace = useTabBarSpace();
+  const alertCount = useAlertCount();
   const [isSearching, setIsSearching] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [zoomLevel, setZoomLevel] = useState(1);
+  // A notification opens its incident directly (Notifications → « incident »).
+  const { incident } = useLocalSearchParams<{ incident?: string }>();
+  const [selectedId, setSelectedId] = useState<string | null>(incident ?? null);
+  useEffect(() => { if (incident) setSelectedId(incident); }, [incident]);
+  // Boutons + / − : chaque toucher envoie une demande de zoom à la carte (nouvelle key).
+  const [zoomRequest, setZoomRequest] = useState<{ delta: number; key: number } | null>(null);
+  const zoom = (delta: number) => setZoomRequest((previous) => ({ delta, key: (previous?.key ?? 0) + 1 }));
+  // Le voyageur sur la carte (point bleu), et la carte centrée sur lui.
+  const here = useCurrentPlace();
+  useEffect(() => { void ensureCurrentPlace(); }, []);
+  const userPosition = here.status === 'ready' && !here.outside ? here.coordinates : null;
+  // A position the device says may be far off gets its margin drawn around the blue dot.
+  const userAccuracyM = userPosition && isApproximate(here) && here.status === 'ready' ? here.accuracyM : null;
+  // « Ma position »: back on the traveller; without a position, it is asked for again.
+  const [centerRequest, setCenterRequest] = useState<{ coordinates: { latitude: number; longitude: number }; key: number; wide?: boolean } | null>(null);
+  const [locating, setLocating] = useState(false);
+  const locateMe = async () => {
+    if (locating) return;
+    setLocating(true);
+    try {
+      const place = await ensureCurrentPlace();
+      if (place.status === 'ready' && !place.outside) setCenterRequest({ coordinates: place.coordinates, key: Date.now(), wide: isApproximate(place) });
+    } finally {
+      setLocating(false);
+    }
+  };
+  // Why the blue dot is missing (or may be off), instead of a map that says nothing.
+  const positionNotice = here.status === 'unavailable'
+    ? 'Position introuvable : autorise la localisation, puis touche le bouton de position.'
+    : here.status === 'ready' && here.outside
+      ? 'Tu es hors du Grand Abidjan : ta position n’apparaît pas sur la carte.'
+      : here.status === 'ready' && isApproximate(here)
+        ? `Ta position est approximative (à ${formatDistance((here.accuracyM ?? 0) / 1000)} près).`
+        : null;
   const [panelFilter, setPanelFilter] = useState<string | null>(null);
   const [voting, setVoting] = useState(false);
   const { reports, updatedAt } = useLiveReports();
+  // What this phone already said about each report: its window shows it instead of the vote buttons.
+  const opinions = useReportOpinions();
   const selectedIncident = reports.find((report) => report.id === selectedId) ?? null;
 
   const filteredIncidents = useMemo(() => {
@@ -62,11 +108,16 @@ export default function TrafficScreen() {
   const vote = async (report: TrafficReport, kind: 'confirm' | 'contest') => {
     setVoting(true);
     try {
-      upsertReport(await voteReport(report.id, kind, clientId()));
+      upsertReport(await voteReport(report.id, kind));
+      rememberReportOpinion(report.id, kind);
       setSelectedId(null);
-      notify('Merci', kind === 'confirm' ? 'Confirmation enregistrée.' : 'Ton avis a été enregistré.');
+      showSuccess(kind === 'confirm' ? 'Merci, confirmation enregistrée' : 'Merci, ton avis est enregistré');
     } catch (error) {
-      notify('Vote impossible', error instanceof Error ? error.message : 'Réessaie dans un instant.');
+      const message = error instanceof Error ? error.message : 'Réessaie dans un instant.';
+      // One opinion per traveller (the author's report counts as one): no error then, the window
+      // simply shows that the opinion is already recorded.
+      if (/déjà donné/i.test(message)) rememberReportOpinion(report.id, 'known');
+      else notify('Vote impossible', message);
     } finally {
       setVoting(false);
     }
@@ -78,10 +129,21 @@ export default function TrafficScreen() {
 
       {/* Full Map View */}
       <View style={styles.mapWrapper}>
-        <OsmMapView style={styles.mapImage} reports={filteredIncidents} onReportPress={(report) => setSelectedId(report.id)} />
+        <OsmMapView
+          style={styles.mapImage}
+          reports={filteredIncidents}
+          onReportPress={(report) => setSelectedId(report.id)}
+          userPosition={userPosition}
+          userAccuracyM={userAccuracyM}
+          centerOnUser
+          centerRequest={centerRequest}
+          zoomRequest={zoomRequest}
+        />
 
-        {/* Traffic Overlay Legend (Top Left) */}
+        {/* Legend: what the colours of the incidents mean, only when there are incidents to read. */}
+        {filteredIncidents.length > 0 && (
         <View style={styles.legendCard}>
+          <Text style={styles.legendTitle}>État des signalements</Text>
           <View style={styles.legendRow}>
             <View style={[styles.colorDot, { backgroundColor: '#F59E0B' }]} />
             <Text style={styles.legendText}>À confirmer</Text>
@@ -95,27 +157,57 @@ export default function TrafficScreen() {
             <Text style={styles.legendText}>Fiable</Text>
           </View>
         </View>
+        )}
 
         {/* Last Updated Badge (Top Right) */}
         <View style={styles.updatedBadge}>
           <View style={styles.greenPulseDot} />
-          <Text style={styles.updatedText}>{updatedAt ? `${filteredIncidents.length} signalement(s) · ${formatClock(updatedAt)}` : 'Connexion…'}</Text>
+          <Text style={styles.updatedText}>{updatedAt ? `${filteredIncidents.length} signalement${filteredIncidents.length > 1 ? 's' : ''} · ${formatClock(updatedAt)}` : 'Connexion…'}</Text>
         </View>
 
-        {/* Zoom Controls */}
+        {/* Nothing to show: say so, and how to report (instead of an empty map that looks broken). */}
+        {updatedAt && filteredIncidents.length === 0 && (
+          <View style={styles.emptyCard} accessibilityLiveRegion="polite">
+            <Ionicons name="checkmark-circle" size={18} color="#16A34A" />
+            <Text style={styles.emptyText}>
+              {panelFilter
+                ? `Aucun signalement de type « ${PANEL_LABELS[panelFilter]} » en ce moment.`
+                : 'Aucun incident signalé pour le moment.'}
+              {' '}Touche <Text style={styles.emptyStrong}>⚠</Text> en haut pour en signaler un.
+            </Text>
+          </View>
+        )}
+
+        {/* Zoom Controls, under « Ma position » */}
         <View style={styles.zoomControlBox}>
           <TouchableOpacity
-            style={styles.zoomButton}
-            onPress={() => setZoomLevel((prev) => Math.min(prev + 0.15, 1.4))}
+            style={[styles.zoomButton, styles.locateButton]}
+            onPress={() => { void locateMe(); }}
             activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel="Ma position"
+          >
+            {locating
+              ? <ActivityIndicator size="small" color="#F26522" />
+              : <Ionicons name={userPosition ? 'locate' : 'locate-outline'} size={20} color="#F26522" />}
+          </TouchableOpacity>
+          <View style={styles.zoomDivider} />
+          <TouchableOpacity
+            style={styles.zoomButton}
+            onPress={() => zoom(1)}
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel="Zoomer"
           >
             <Ionicons name="add" size={20} color="#FFFFFF" />
           </TouchableOpacity>
           <View style={styles.zoomDivider} />
           <TouchableOpacity
             style={styles.zoomButton}
-            onPress={() => setZoomLevel((prev) => Math.max(prev - 0.15, 0.85))}
+            onPress={() => zoom(-1)}
             activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel="Dézoomer"
           >
             <Ionicons name="remove" size={20} color="#FFFFFF" />
           </TouchableOpacity>
@@ -137,7 +229,7 @@ export default function TrafficScreen() {
           </TouchableOpacity>
 
           {/* Title */}
-          <Text style={styles.headerTitle}>Trafics</Text>
+          <Text style={styles.headerTitle}>Trafic</Text>
 
           {/* Right Action Icons Row */}
           <View style={styles.headerRightActions}>
@@ -148,9 +240,11 @@ export default function TrafficScreen() {
               activeOpacity={0.7}
             >
               <Ionicons name="notifications" size={22} color="#000000" />
-              <View style={styles.notificationBadge}>
-                <Text style={styles.notificationBadgeText}>5</Text>
-              </View>
+              {alertCount > 0 && (
+                <View style={styles.notificationBadge}>
+                  <Text style={styles.notificationBadgeText}>{alertBadge(alertCount)}</Text>
+                </View>
+              )}
             </TouchableOpacity>
 
             {/* Warning Triangle Report Icon */}
@@ -182,11 +276,12 @@ export default function TrafficScreen() {
 
         {/* Expandable Search Input Bar */}
         {isSearching && (
-          <View style={styles.searchBarContainer}>
+          <View style={[styles.searchBarContainer, searchFocus.frameStyle]}>
             <Ionicons name="search" size={18} color="#64748B" style={{ marginRight: 8 }} />
             <TextInput
+              {...searchFocus.inputProps}
               style={styles.searchInput}
-              placeholder="Rechercher un axe, commune (Abobo, Plateau...)"
+              placeholder="Rechercher un axe, une commune (Abobo, Plateau…)"
               placeholderTextColor="#94A3B8"
               value={searchQuery}
               onChangeText={setSearchQuery}
@@ -202,7 +297,27 @@ export default function TrafficScreen() {
       </SafeAreaView>
 
       {/* Floating Bottom Incident Category Panel (Floating above Bottom Navigation Bar) */}
-      <View style={styles.bottomFloatingPanelWrapper}>
+      <View style={[styles.bottomFloatingPanelWrapper, { bottom: tabBarSpace - 2 }]}>
+        {positionNotice && (
+          <TouchableOpacity
+            style={styles.positionNotice}
+            onPress={() => { void locateMe(); }}
+            activeOpacity={0.85}
+            accessibilityRole="button"
+            accessibilityLiveRegion="polite"
+          >
+            <Ionicons name="locate-outline" size={16} color="#F26522" />
+            <Text style={styles.positionNoticeText}>{positionNotice}</Text>
+          </TouchableOpacity>
+        )}
+        {/* Filter in use: which incidents are shown, and how to see all of them again. */}
+        {panelFilter && (
+          <TouchableOpacity style={styles.filterChip} onPress={() => setPanelFilter(null)} activeOpacity={0.85} accessibilityRole="button"
+            accessibilityLabel={`Filtre ${PANEL_LABELS[panelFilter]}. Toucher pour tout afficher.`}>
+            <Text style={styles.filterChipText}>{PANEL_LABELS[panelFilter]} seulement · {filteredIncidents.length}</Text>
+            <Ionicons name="close" size={14} color="#FFFFFF" />
+          </TouchableOpacity>
+        )}
         <View style={styles.categoryCardPanel}>
           <TouchableOpacity
             style={styles.categoryItem}
@@ -317,7 +432,7 @@ export default function TrafficScreen() {
                         { color: getMarkerColor(selectedIncident.type) },
                       ]}
                     >
-                      {REPORT_STATUS_LABEL[selectedIncident.status]} · {selectedIncident.confirmations} confirmation(s)
+                      {REPORT_STATUS_LABEL[selectedIncident.status]} · {confirmationsLabel(selectedIncident.confirmations)}
                     </Text>
                   </View>
 
@@ -329,6 +444,13 @@ export default function TrafficScreen() {
                   {selectedIncident.description ? <Text style={styles.modalDescription}>{selectedIncident.description}</Text> : null}
                 </View>
 
+                {opinionFor(opinions, selectedIncident.id) ? (
+                  // Already said from this phone (or recorded by the server): no button it would refuse.
+                  <View style={styles.opinionDone} accessibilityLiveRegion="polite">
+                    <Ionicons name="checkmark-circle" size={20} color="#F26522" />
+                    <Text style={styles.opinionDoneText}>{OPINION_LABEL[opinionFor(opinions, selectedIncident.id)!]}</Text>
+                  </View>
+                ) : (
                 <View style={styles.modalActionsRow}>
                   <TouchableOpacity
                     style={styles.modalPrimaryButton}
@@ -349,6 +471,12 @@ export default function TrafficScreen() {
                     <Text style={styles.modalCloseButtonText}>Plus là</Text>
                   </TouchableOpacity>
                 </View>
+                )}
+
+                {/* Follow the zone around this report: an alert for each new report there, while SIRA is open. */}
+                <FollowZoneButton
+                  place={{ label: selectedIncident.location || selectedIncident.title, latitude: selectedIncident.lat, longitude: selectedIncident.lon }}
+                />
               </>
             )}
           </View>
@@ -457,6 +585,53 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
     zIndex: 5,
   },
+  legendTitle: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#64748B',
+    marginBottom: 4,
+  },
+  emptyCard: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 146 : 136,
+    left: 14,
+    right: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    zIndex: 5,
+  },
+  emptyText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#334155',
+  },
+  emptyStrong: {
+    color: '#EF4444',
+    fontWeight: '800',
+  },
+  filterChip: {
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#1E1E1E',
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    marginBottom: 8,
+  },
+  filterChipText: {
+    color: '#FFFFFF',
+    fontSize: 12.5,
+    fontWeight: '700',
+  },
   legendRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -522,6 +697,31 @@ const styles = StyleSheet.create({
   zoomDivider: {
     height: 6,
   },
+  // White with an orange target, apart from the orange + and −.
+  locateButton: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#F26522',
+  },
+  positionNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    alignSelf: 'stretch',
+    marginHorizontal: 4,
+    marginBottom: 8,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  positionNoticeText: {
+    flex: 1,
+    fontSize: 12.5,
+    color: '#334155',
+  },
   mapMarkerBadge: {
     position: 'absolute',
     width: 36,
@@ -532,9 +732,9 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#FFFFFF',
   },
+  // Its bottom follows the bar (useTabBarSpace), set where it is drawn.
   bottomFloatingPanelWrapper: {
     position: 'absolute',
-    bottom: Platform.OS === 'ios' ? 76 : 68,
     left: 0,
     right: 0,
     alignItems: 'center',
@@ -570,8 +770,11 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 2,
   },
+  // Filtre en cours : bouton foncé et cerclé, les autres restent orange.
   categoryIconCircleActive: {
-    backgroundColor: '#F26522',
+    backgroundColor: '#1E1E1E',
+    borderWidth: 2,
+    borderColor: '#F26522',
   },
   categoryIconCircle: {
     width: 42,
@@ -670,6 +873,20 @@ const styles = StyleSheet.create({
   modalActionsRow: {
     flexDirection: 'row',
     gap: 10,
+  },
+  opinionDone: {
+    height: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#FFF4EE',
+    borderRadius: 12,
+  },
+  opinionDoneText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#111111',
   },
   modalPrimaryButton: {
     flex: 1,

@@ -31,6 +31,8 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 !.env.example
+# secrets du serveur de test (modèle : infra/server.env.example)
+infra/server.env
 
 # vercel
 .vercel
@@ -62,3 +64,9 @@ services/community/data/dev-jwt-secret
 
 # espaces de travail d'éditeur
 .kilo/
+
+# voix enregistrées pour tester ou entraîner la voix (vraies personnes) : jamais dans Git
+services/voice/enregistrements/
+
+# signalements des voyageurs gardés par l'API en local (services/api/runtime/reports.json)
+services/api/runtime/

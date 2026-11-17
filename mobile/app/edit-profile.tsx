@@ -2,8 +2,6 @@ import React, { useState } from 'react';
 import {
   StyleSheet,
   View,
-  Text,
-  TextInput,
   TouchableOpacity,
   ScrollView,
   SafeAreaView,
@@ -11,7 +9,8 @@ import {
   Platform,
   Alert,
 } from 'react-native';
-import { Image } from 'expo-image';
+import { Text, TextInput } from '@/components/sira-text';
+import { ProfileAvatar } from '@/components/profile-avatar';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
@@ -83,11 +82,7 @@ export default function EditProfileScreen() {
                 activeOpacity={0.85}
                 onPress={() => setShowPhotoModal(true)}
               >
-                <Image
-                  source={require('@/assets/images/sira-character-assistant.png')}
-                  style={styles.avatarImage}
-                  contentFit="cover"
-                />
+                <ProfileAvatar size={112} />
                 <TouchableOpacity
                   style={styles.cameraBadge}
                   activeOpacity={0.8}
@@ -111,9 +106,9 @@ export default function EditProfileScreen() {
                 />
               </View>
 
-              {/* Field 2: Prenom */}
+              {/* Field 2: Prénom */}
               <View style={styles.inputGroup}>
-                <Text style={styles.label}>Prenom</Text>
+                <Text style={styles.label}>Prénom</Text>
                 <TextInput
                   style={styles.input}
                   value={prenom}
@@ -122,9 +117,9 @@ export default function EditProfileScreen() {
                 />
               </View>
 
-              {/* Field 3: Numero */}
+              {/* Field 3: Numéro */}
               <View style={styles.inputGroup}>
-                <Text style={styles.label}>Numero</Text>
+                <Text style={styles.label}>Numéro</Text>
                 <TextInput
                   style={styles.input}
                   value={numero}
@@ -147,7 +142,7 @@ export default function EditProfileScreen() {
 
               {/* Field 5: Email */}
               <View style={styles.inputGroup}>
-                <Text style={styles.label}>Email</Text>
+                <Text style={styles.label}>E-mail</Text>
                 <TextInput
                   style={styles.input}
                   value={email}

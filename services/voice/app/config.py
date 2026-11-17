@@ -31,20 +31,60 @@ NER_MODEL_DIR = MODELS_DIR / "sira-ner-fr-ci"
 GAZETTEER_PATH = _path("VOICE_GAZETTEER", MODELS_DIR / "gazetteer_v0.4.json")
 
 # Transcription : faster-whisper (Silero VAD intégré). "small" ou "turbo" en int8 tournent sur CPU.
-WHISPER_NAME = os.environ.get("VOICE_WHISPER_MODEL", "small")
+# Par défaut, Whisper small affiné sur les voix d'Abidjan (outils/entrainement_whisper_sira.ipynb) s'il est installé :
+# 6,4 % et 8,6 % de mots faux au lieu de 20,2 % et 22,3 %, 31/32 bons lieux au lieu de 26/32, sur deux voix jamais
+# entendues à l'entraînement (benchmarks/2026-11-02_1359_* et 2026-11-02_1405_*). Il n'est pas dans Git : sans lui, small.
+WHISPER_FINE_TUNED = "sira-small-ft"
+
+
+def whisper_name(env, whisper_dir: Path) -> str:
+    chosen = (env.get("VOICE_WHISPER_MODEL") or "").strip()
+    if chosen:
+        return chosen
+    return WHISPER_FINE_TUNED if (whisper_dir / WHISPER_FINE_TUNED / "model.bin").exists() else "small"
+
+
+WHISPER_NAME = whisper_name(os.environ, LOCAL_MODELS / "whisper")
 _WHISPER_LOCAL = LOCAL_MODELS / "whisper" / WHISPER_NAME
 # Copie locale (npm run voice:setup) si elle existe, sinon faster-whisper télécharge le modèle au premier usage.
 WHISPER_MODEL = str(_WHISPER_LOCAL) if (_WHISPER_LOCAL / "model.bin").exists() else WHISPER_NAME
 # Recherche large (5) : ≈ 20 % plus lente que 1 sur CPU, mais garde « je quitte Yopougon » et « je descends où »
 # que la recherche simple déformait (mesuré sur 8 phrases). Le gain de vitesse vient du prompt court (speech.py).
 WHISPER_BEAM = max(1, int(_float("VOICE_WHISPER_BEAM", 5)))
+# Garde-fous contre une transcription qui s'emballe (23 s sur une phrase de Marie, 26 s sur une de Franck, mesurés
+# le 2026-10-25) : Whisper relançait le décodage à des températures plus hautes et répétait les mêmes mots.
+# - Une seule température (0) : pas de nouveaux essais de plus en plus aléatoires sur une phrase douteuse.
+# - Au plus WHISPER_TOKENS_PER_S jetons par seconde d'audio (+ 16) : une commande parlée en produit ~3 à 5 par seconde.
+WHISPER_TEMPERATURE = max(0.0, _float("VOICE_WHISPER_TEMPERATURE", 0.0))
+WHISPER_TOKENS_PER_S = max(4.0, _float("VOICE_WHISPER_TOKENS_PER_S", 8.0))
+# Transcription rapide d'abord : Parakeet TDT 0.6B v3 (NVIDIA, CC BY 4.0, int8 ONNX via onnx-asr), ≈ 0,5 s par phrase
+# contre 3 à 4,5 s pour Whisper sur le PC de dev (mesuré le 2026-10-25), mais moins sûr sur les noms d'Abidjan.
+# « hybride » : Parakeet, puis Whisper seulement quand le lieu ou l'intention ne sont pas sûrs ; « whisper » : Whisper seul.
+ASR_MODE = os.environ.get("VOICE_ASR", "hybride")
+if ASR_MODE not in ("hybride", "whisper"):
+    ASR_MODE = "hybride"
+PARAKEET_DIR = _path("VOICE_PARAKEET_DIR", LOCAL_MODELS / "parakeet-tdt-0.6b-v3-int8")
 WHISPER_DEVICE = os.environ.get("VOICE_WHISPER_DEVICE", "cpu")
 WHISPER_COMPUTE = os.environ.get("VOICE_WHISPER_COMPUTE", "int8")
 
-# Synthèse vocale : voix Piper française (fichier .onnx + .onnx.json)
-PIPER_VOICE = _path("VOICE_PIPER_MODEL", LOCAL_MODELS / "piper" / "fr_FR-siwis-medium.onnx")
+# Synthèse vocale : UNE seule voix, « pierre » (Piper fr_FR-upmc-medium, locuteur 1, CC BY-SA 4.0), un homme comme
+# le personnage de SIRA. Pas d'autre voix, ni de voix de secours : sans elle, SIRA affiche sa réponse sans la dire.
+PIPER_VOICE = _path("VOICE_PIPER_MODEL", LOCAL_MODELS / "piper" / "fr_FR-upmc-medium.onnx")
+# Locuteur dans un modèle à plusieurs voix (upmc : 1 = pierre) ; vide pour un modèle à une seule voix.
+_SPEAKER = os.environ.get("VOICE_PIPER_SPEAKER", "1").strip()
+PIPER_SPEAKER = int(_SPEAKER) if _SPEAKER else None
 # Vitesse de lecture : 1.0 = voix d'origine, 1.1 = 10 % plus rapide (plus naturel pour des consignes courtes).
 SPEECH_RATE = min(1.5, max(0.7, _float("VOICE_SPEECH_RATE", 1.1)))
+# Intonation de Piper : plus bas = voix plus régulière. 0,5 / 0,6 choisis à l'écoute le 2026-10-25 (réglage « D »,
+# préféré à l'actuel 0,667 / 0,8, à « plus posé » et à « plus vivant ») ; les valeurs d'origine du modèle sont 0,667 / 0,8.
+NOISE_SCALE = min(1.0, max(0.0, _float("VOICE_NOISE_SCALE", 0.5)))
+NOISE_W = min(1.0, max(0.0, _float("VOICE_NOISE_W", 0.6)))
+# Voix envoyée à l'application : MP3 (≈ 9 fois plus léger que le WAV : 47 Ko au lieu de 411 Ko pour 9 s de parole,
+# mesuré le 2026-10-25), lu partout (web, Android, iPhone). « wav » pour l'audio brut.
+AUDIO_FORMAT = os.environ.get("VOICE_AUDIO_FORMAT", "mp3")
+if AUDIO_FORMAT not in ("mp3", "wav"):
+    AUDIO_FORMAT = "mp3"
+AUDIO_BITRATE = int(_float("VOICE_AUDIO_BITRATE", 40_000))
 # Charger Whisper et Piper dès le démarrage (sinon la première phrase attend 10 à 20 s). 0 = au premier usage.
 PRELOAD = os.environ.get("VOICE_PRELOAD", "1") != "0"
 
@@ -52,14 +92,32 @@ PRELOAD = os.environ.get("VOICE_PRELOAD", "1") != "0"
 SIRA_API_URL = os.environ.get("SIRA_API_URL", "http://127.0.0.1:4000/api/v1").rstrip("/")
 SIRA_API_TIMEOUT_S = _float("SIRA_API_TIMEOUT_S", 60.0)
 
-# Règles de décision (mesurées sur la validation v0.4 : ~99 % de lieux justes quand SIRA ne demande pas)
-PLACE_THRESHOLD = _float("VOICE_PLACE_THRESHOLD", 60.0)
+# Règles de décision. Le seuil de 60 avait été mesuré sur des lieux du répertoire seulement : un lieu qui n'y est
+# pas trouvait toujours un voisin au-dessus (« Bouaké » → Bouquet 86, « banane » → Anan 89, « Dakar » → MACA 67)
+# et le trajet partait sans question. Les vrais lieux mal dits restent presque tous au-dessus de 100 ; entre les
+# deux, SIRA demande « Tu veux dire … ? ».
+PLACE_THRESHOLD = _float("VOICE_PLACE_THRESHOLD", 90.0)
 PLACE_MARGIN = _float("VOICE_PLACE_MARGIN", 3.0)
 INTENT_MIN_CONFIDENCE = _float("VOICE_INTENT_MIN_CONFIDENCE", 0.5)
 
 # FAQ : fiches Markdown ; une fiche répond au-dessus de ce score (0 à 1, réglé sur services/voice/tests).
 KNOWLEDGE_DIR = _path("VOICE_KNOWLEDGE_DIR", SERVICE_ROOT / "knowledge")
 FAQ_THRESHOLD = _float("VOICE_FAQ_THRESHOLD", 0.65)
+
+# LLM local, chef d'orchestre (llm.py) : Ministral 3 3B dans llama-server. Vide = pas de LLM (les règles seules).
+# npm run dev:stack le lance tout seul et remplit cette adresse si le modèle est dans services/models/llm/.
+LLM_URL = os.environ.get("VOICE_LLM_URL", "").strip()
+# ~7 s par réponse sur le PC de dev sans GPU (mesuré le 2026-10-24) ; au-delà, les règles reprennent la main.
+LLM_TIMEOUT_S = max(1.0, _float("VOICE_LLM_TIMEOUT_S", 20.0))
+
+# Compagnon (« Discuter avec SIRA », companion.py). La rédaction libre par le LLM est coupée par défaut : mesurée le
+# 2026-11-09 à 35-110 s et avec des inventions (docs/assistant-compagnon.md). À activer sur une machine avec GPU.
+COMPANION_COMPOSE = os.environ.get("VOICE_COMPANION_COMPOSE", "false").strip().lower() in ("1", "true", "oui")
+COMPANION_TIMEOUT_S = max(1.0, _float("VOICE_COMPANION_TIMEOUT_S", 30.0))
+
+# Compléments du répertoire de lieux (dans Git) : lieux ajoutés, coordonnées manquantes, variantes d'orthographe et
+# commune exacte de chaque lieu (scripts/corriger_lieux.py). Appliqués au chargement par PlaceResolver.
+LIEUX_COMPLEMENTS = _path("VOICE_LIEUX_COMPLEMENTS", KNOWLEDGE_DIR / "lieux_complements.json")
 
 MAX_AUDIO_BYTES = int(_float("VOICE_MAX_AUDIO_BYTES", 5 * 1024 * 1024))
 MAX_AUDIO_SECONDS = _float("VOICE_MAX_AUDIO_SECONDS", 30.0)
