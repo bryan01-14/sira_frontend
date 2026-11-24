@@ -73,8 +73,8 @@ PIPER_VOICE = _path("VOICE_PIPER_MODEL", LOCAL_MODELS / "piper" / "fr_FR-upmc-me
 # Locuteur dans un modèle à plusieurs voix (upmc : 1 = pierre) ; vide pour un modèle à une seule voix.
 _SPEAKER = os.environ.get("VOICE_PIPER_SPEAKER", "1").strip()
 PIPER_SPEAKER = int(_SPEAKER) if _SPEAKER else None
-# Vitesse de lecture : 1.0 = voix d'origine, 1.1 = 10 % plus rapide (plus naturel pour des consignes courtes).
-SPEECH_RATE = min(1.5, max(0.7, _float("VOICE_SPEECH_RATE", 1.1)))
+# Vitesse de lecture : 1.0 = voix d'origine, choisie à l'écoute le 2026-11-19 (1.1 parlait trop vite).
+SPEECH_RATE = min(1.5, max(0.7, _float("VOICE_SPEECH_RATE", 1.0)))
 # Intonation de Piper : plus bas = voix plus régulière. 0,5 / 0,6 choisis à l'écoute le 2026-10-25 (réglage « D »,
 # préféré à l'actuel 0,667 / 0,8, à « plus posé » et à « plus vivant ») ; les valeurs d'origine du modèle sont 0,667 / 0,8.
 NOISE_SCALE = min(1.0, max(0.0, _float("VOICE_NOISE_SCALE", 0.5)))
@@ -118,6 +118,8 @@ COMPANION_TIMEOUT_S = max(1.0, _float("VOICE_COMPANION_TIMEOUT_S", 30.0))
 # Compléments du répertoire de lieux (dans Git) : lieux ajoutés, coordonnées manquantes, variantes d'orthographe et
 # commune exacte de chaque lieu (scripts/corriger_lieux.py). Appliqués au chargement par PlaceResolver.
 LIEUX_COMPLEMENTS = _path("VOICE_LIEUX_COMPLEMENTS", KNOWLEDGE_DIR / "lieux_complements.json")
+# Dictionnaire SIRA : article et prononciation des lieux, modes et mots d'Abidjan (app/lexicon.py)
+DICTIONARY_PATH = _path("VOICE_DICTIONARY", KNOWLEDGE_DIR / "dictionnaire.csv")
 
 MAX_AUDIO_BYTES = int(_float("VOICE_MAX_AUDIO_BYTES", 5 * 1024 * 1024))
 MAX_AUDIO_SECONDS = _float("VOICE_MAX_AUDIO_SECONDS", 30.0)

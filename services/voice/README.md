@@ -167,7 +167,7 @@ Si `reply_audio` est vide (Piper non installé), afficher `reply_text` sans le l
 | `VOICE_LLM_TIMEOUT_S` | `20` | au-delà, la voix répond avec ses règles habituelles |
 | `VOICE_ASR` | `hybride` | `hybride` : Parakeet d'abord, Whisper si le lieu ou l'intention ne sont pas sûrs ; `whisper` : Whisper seul |
 | `VOICE_PARAKEET_DIR` | `services/models/voice/parakeet-tdt-0.6b-v3-int8` | modèle Parakeet ; absent, le service utilise Whisper seul |
-| `VOICE_SPEECH_RATE` | `1.1` | vitesse de la voix de SIRA (`1.0` = voix d'origine) |
+| `VOICE_SPEECH_RATE` | `1.0` | vitesse de la voix de SIRA (`1.0` = voix d'origine, choisie à l'écoute ; `1.1` = 10 % plus rapide) |
 | `VOICE_NOISE_SCALE` / `VOICE_NOISE_W` | `0.5` / `0.6` | intonation de Piper : plus bas = plus régulier (choisi à l'écoute le 2026-10-25 ; valeurs du modèle `0.667` / `0.8`) |
 | `VOICE_AUDIO_FORMAT` | `mp3` | voix envoyée à l'appli : `mp3` (≈ 9 fois plus léger, arrive vite en 3G) ou `wav` |
 | `VOICE_AUDIO_BITRATE` | `40000` | débit du MP3 en bits/s |
@@ -242,6 +242,24 @@ Les questions qui ne sont pas des demandes de trajet (« c'est quoi un gbaka ? �
 - Sans trajet en cours : « Vous n'avez pas de trajet en cours… » ; API des signalements injoignable : SIRA le dit.
 - Hors sujet (« raconte-moi une blague ») : refus poli, sans rien inventer.
 - Côté app : écran **Discuter avec SIRA** (`mobile/app/chat.tsx`), depuis le profil.
+
+## Dictionnaire SIRA : articles et prononciation (`knowledge/dictionnaire.csv`)
+
+Un seul fichier, modifiable dans Excel (séparateur `;`), relu par le service dès qu'il change (`app/lexicon.py`) :
+
+| Colonne | Rôle |
+|---|---|
+| `mot` | lieu, mode ou mot d'Abidjan, écrit comme dans SIRA |
+| `categorie` | `commune`, `quartier`, `mode`, `mot`, ou `nom_commun` (premier mot d'un nom de lieu : « Gare » → la) |
+| `article` | `le`, `la`, `les`, `l'` ou vide : « au Plateau », « vers la Gare Nord », « à Adjamé » |
+| `dire_comme` | façon de l'écrire pour que pierre le dise bien (vide = tel quel) |
+| `phonemes` | prononciation exacte dans l'alphabet d'espeak, prioritaire sur `dire_comme` |
+| `statut` | `à écouter` puis `validé` par un Ivoirien |
+
+Page d'écoute : http://localhost:8200/voice/dictionnaire/page (chaque mot dans une phrase de SIRA, ce que Piper
+prononce, et un champ pour essayer une autre écriture). Une prononciation corrigée change la clé du cache de voix :
+l'ancienne voix n'est plus jamais servie. Les articles des noms propres (« le Plateau », « la Riviera ») et les
+`note` sont des propositions à valider ; les prononciations ne sont remplies que par des Ivoiriens, à l'écoute.
 
 ## Limites à connaître
 

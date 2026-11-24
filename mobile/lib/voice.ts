@@ -31,8 +31,9 @@ export const VOICE_MODE_DETAILS: Record<VoiceMode, string> = {
   off: 'SIRA ne parle pas : tout reste écrit à l’écran.',
 };
 
-// Until the traveller chooses, SIRA stays silent.
-export const DEFAULT_VOICE_MODE: VoiceMode = 'off';
+// SIRA speaks from the start (« Akwaba » at home), as asked for the demo on 2026-11-19; the traveller can
+// still pick « Alertes seulement » or « Voix coupée » (Paramètres, or the speaker button).
+export const DEFAULT_VOICE_MODE: VoiceMode = 'on';
 let mode: VoiceMode = DEFAULT_VOICE_MODE;
 const listeners = new Set<() => void>();
 
@@ -48,7 +49,7 @@ export async function loadVoiceMode() {
   try {
     const saved = await readSetting(KEY);
     if (saved && (MODES as string[]).includes(saved)) { mode = saved as VoiceMode; listeners.forEach((l) => l()); }
-  } catch { /* réglage illisible : voix coupée */ }
+  } catch { /* réglage illisible : voix activée */ }
 }
 
 export function setVoiceMode(next: VoiceMode) {
@@ -124,7 +125,8 @@ export function stopSpeaking() {
 // Sentences written by the app (greeting, steps, prompts) come back often: SIRA's
 // voice for each one is kept (on the phone: in the cache folder, even after a
 // restart; on the web: for the session), so it plays at once the next time.
-const CACHE_VERSION = 'v5';
+// v6 : pierre parle à la vitesse 1,0 (2026-11-19) ; les voix gardées à 1,1 ne resservent plus.
+const CACHE_VERSION = 'v6';
 const WEB_CACHE_MAX = 40;
 const webCache = new Map<string, string>();
 // Waited for, since there is no other voice: a sentence arrives late rather than in another voice.

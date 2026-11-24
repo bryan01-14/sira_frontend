@@ -63,3 +63,65 @@ export type CenterRequest = { coordinates: MapPoint; key: number; wide?: boolean
 
 // Demande de zoom des boutons + / − : delta en niveaux de zoom (+1, −1) ; key change à chaque toucher.
 export type ZoomRequest = { delta: number; key: number };
+
+// Ce que règlent les boutons de carte (Calques, 2D/3D, boussole) et le guidage. Seule la carte web
+// (MapLibre) s'en sert pour l'instant ; la carte du téléphone les ignore jusqu'à son passage à MapLibre.
+export type MapDisplayOptions = {
+  mapStyle?: 'plan' | 'nuit' | 'epure';
+  tilted?: boolean;  // carte inclinée, bâtiments debout
+  showTransitLines?: boolean;  // couche « Lignes SIRA »
+  showBuildings?: boolean;
+  // Cap de la carte en degrés (0 = nord en haut) : l'écran montre la boussole quand elle est tournée.
+  onBearingChange?: (bearing: number) => void;
+  // Boussole : chaque nouvelle key remet le nord en haut.
+  northRequest?: { key: number } | null;
+  // Guidage : la carte suit ce point, inclinée et tournée dans le sens du trajet ; null = vue d'ensemble.
+  follow?: MapPoint | null;
+  // Suivi en pause (le voyageur regarde ailleurs) : la carte reste penchée là où il l'a mise.
+  followPaused?: boolean;
+  // Vue du suivi selon l'étape (lib/ride-progress-core.ts) : à pied, à l'arrêt, en véhicule.
+  followCamera?: { kind: string; zoom: number; pitch: number } | null;
+  // Le voyageur déplace la carte à un doigt pendant le suivi (à chaque fois) : l'écran met le suivi en pause.
+  // Zoomer à deux doigts ne compte pas : le suivi continue, au zoom choisi.
+  onFollowPause?: () => void;
+};
+
+const toRad = (degrees: number) => (degrees * Math.PI) / 180;
+const metres = (a: MapPoint, b: MapPoint) =>
+  Math.hypot(b.latitude - a.latitude, (b.longitude - a.longitude) * Math.cos(toRad(a.latitude))) * 111_320;
+
+// Sens de marche (0 = nord, 90 = est) au point le plus proche du trajet, vers un point ~25 m plus loin :
+// la carte du guidage se tourne pour que la route monte devant le voyageur. null : trajet trop court.
+// ---- Guidage dans l'appli installée (react-native-maps) : la caméra se règle autrement que sur le web. ----
+
+// Mètres par point d'écran à un zoom donné (tuiles de 256 points, projection Web Mercator).
+export const metresPerPoint = (zoom: number, latitude: number) => (156_543.034 * Math.cos(toRad(latitude))) / 2 ** zoom;
+
+// Plans d'Apple (iPhone) règle la caméra par son altitude en mètres, pas par un zoom. Approximation : la hauteur de
+// l'écran couvre au sol ce qu'elle couvrirait à ce zoom, vue sous un angle vertical de 30°. À régler sur un iPhone.
+export const IOS_CAMERA_FOV_DEG = 30;
+export function altitudeForZoom(zoom: number, latitude: number, screenHeightPt: number) {
+  const span = metresPerPoint(zoom, latitude) * screenHeightPt;
+  return Math.round(span / (2 * Math.tan(toRad(IOS_CAMERA_FOV_DEG / 2))));
+}
+
+// Un point à `distance` mètres devant, dans la direction `headingDeg` (0 = nord) : la caméra vise un peu devant le
+// voyageur pour que son point soit dans le bas de l'écran et la route devant lui, comme sur le web (offset).
+export function pointAhead(point: MapPoint, headingDeg: number, distance: number): MapPoint {
+  const angle = toRad(headingDeg);
+  return {
+    latitude: point.latitude + (distance * Math.cos(angle)) / 111_320,
+    longitude: point.longitude + (distance * Math.sin(angle)) / (111_320 * Math.cos(toRad(point.latitude))),
+  };
+}
+
+export function headingAlong(path: MapPoint[], here: MapPoint): number | null {
+  if (path.length < 2) return null;
+  let nearest = 0;
+  path.forEach((point, index) => { if (metres(here, point) < metres(here, path[nearest])) nearest = index; });
+  const from = path[nearest];
+  const ahead = path.slice(nearest + 1).find((point) => metres(from, point) >= 25) ?? path[path.length - 1];
+  if (metres(from, ahead) < 1) return null;
+  const angle = Math.atan2((ahead.longitude - from.longitude) * Math.cos(toRad(from.latitude)), ahead.latitude - from.latitude);
+  return ((angle * 180) / Math.PI + 360) % 360;
+}

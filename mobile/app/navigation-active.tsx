@@ -19,7 +19,8 @@ import { TripRatingModal } from '@/components/trip-rating-modal';
 import { notify } from '@/lib/notify';
 import { journeyStore, useJourneyStore } from '@/lib/journey-store';
 import { fetchJourneys, journeyImpact, reportFare, voteReport, type ApiJourney, type LegMode, type ReportImpact } from '@/lib/sira-api';
-import { formatClock, formatDistance, formatDuration, formatPrice, isVehicle, journeyPath, journeyTitle, stepDescription, stepTitle, timeline } from '@/lib/journey-format';
+import { formatClock, formatDistance, formatDuration, formatPrice, isVehicle, journeyPath, journeyTitle, legPath, stepDescription, stepTitle, timeline } from '@/lib/journey-format';
+import { useMapSettings } from '@/lib/map-settings';
 import { upsertReport, useLiveReports } from '@/lib/reports';
 import { locateUser, refreshCurrentPlace } from '@/lib/places';
 import { usageAllowed } from '@/lib/usage';
@@ -29,6 +30,10 @@ import { arrivalPhrase, placeForTitle } from '@/lib/saved-places';
 import { alightSoonSpeech, arrivalSpeech, fareQuestion, gpsEvent, gpsHint, minutes, spokenJourney, startSpeech, stepSpeech } from '@/lib/guidance';
 import { cycleVoiceMode, say, stopSpeaking, useVoiceMode, VOICE_MODE_ICONS, VOICE_MODE_LABELS } from '@/lib/voice';
 import { useSpokenQuestion } from '@/lib/use-spoken-question';
+import { lieuViseVers, oublierLieuVise } from '@/lib/lieu-vise';
+import { followCamera, rideCountdown, rideProgress } from '@/lib/ride-progress-core';
+import * as Haptics from 'expo-haptics';
+import { repondreEncoreLa } from '@/lib/lieux';
 
 const { height } = Dimensions.get('window');
 
@@ -38,11 +43,20 @@ const MODE_ICONS: Record<LegMode, keyof typeof Ionicons.glyphMap> = {
 const MODE_COLORS: Record<LegMode, string> = {
   walk: '#10B981', wait: '#64748B', transfer: '#7C3AED', sotra: '#F26522', gbaka: '#F26522', woro: '#1E6091', taxi: '#1E6091', boat: '#0284C7',
 };
+// Map moved by hand during guidance: it follows the traveller again after this long without a touch.
+// 8 s: a proposal (Waze also comes back by itself after a few seconds), to adjust in real use.
+const RECENTER_AFTER_MS = 8_000;
 // Speaker button, as in Google Maps: all spoken → alerts only → muted.
 
 export default function NavigationActiveScreen() {
   const router = useRouter();
-  const { activeJourney: journey, search } = useJourneyStore();
+  const { activeJourney, search } = useJourneyStore();
+  // « Quitter » and « Terminer » clear the followed journey, then go back. The screen keeps the last journey
+  // until it is gone: without it, it showed « Aucun trajet en cours » for a moment while leaving (the flash
+  // with the tall red « Retour » bar, 22 novembre 2026).
+  const [lastJourney, setLastJourney] = useState(activeJourney);
+  if (activeJourney && activeJourney !== lastJourney) setLastJourney(activeJourney);
+  const journey = activeJourney ?? lastJourney;
   const { reports } = useLiveReports();
   const [startedAt] = useState(() => new Date());
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
@@ -53,6 +67,8 @@ export default function NavigationActiveScreen() {
   const [gpsOn, setGpsOn] = useState(false);
   const [arrived, setArrived] = useState(false);
   const [fare, setFare] = useState<{ state: 'ask' | 'sent'; typed: string }>({ state: 'ask', typed: '' });
+  // « Tu l'as trouvé ? » : arrivé au lieu choisi depuis sa fiche (« Y aller »).
+  const [found, setFound] = useState<'ask' | 'sending' | 'yes' | 'no'>('ask');
   const [showExitConfirm, setShowExitConfirm] = useState(false);
   // « Comment s'est passé ton trajet ? », asked when the traveller ends an arrived trip.
   const [showRating, setShowRating] = useState(false);
@@ -72,6 +88,46 @@ export default function NavigationActiveScreen() {
 
   const targetDestination = search?.arrival.name ?? 'Destination';
   const steps = useMemo(() => journey ? timeline(journey, startedAt) : [], [journey, startedAt]);
+  // Carte du guidage (web : MapLibre ; appli installée : react-native-maps) : penchée, elle suit le voyageur, la
+  // route montant devant lui, comme un GPS.
+  // Sans GPS, elle suit le début de l'étape en cours. « Vue d'ensemble » la remet à plat sur tout le trajet.
+  const mapSettings = useMapSettings();
+  const [here, setHere] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [overview, setOverview] = useState(false);
+  // Le voyageur a déplacé la carte : le suivi s'arrête, la carte reste penchée. « Recentrer » le reprend, et il
+  // reprend tout seul après RECENTER_AFTER_MS sans toucher la carte (comme Waze).
+  const [followPaused, setFollowPaused] = useState(false);
+  const recenterTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const clearRecenterTimer = () => { if (recenterTimer.current) clearTimeout(recenterTimer.current); recenterTimer.current = null; };
+  const pauseFollow = () => {
+    setFollowPaused(true);
+    clearRecenterTimer();
+    recenterTimer.current = setTimeout(() => { recenterTimer.current = null; setFollowPaused(false); }, RECENTER_AFTER_MS);
+  };
+  const recenter = () => { clearRecenterTimer(); setFollowPaused(false); setOverview(false); };
+  // « Vue d'ensemble » : the whole trip, flat; only by its button, never by moving the map.
+  const showOverview = () => { clearRecenterTimer(); setFollowPaused(false); setOverview(true); };
+  useEffect(() => clearRecenterTimer, []);
+  // Without GPS, the map follows the start of the current step. A step drawn without a path (waiting at a stop,
+  // changing on foot) takes the start of the next drawn step, else the end of the previous one: without it the
+  // map lost its point and fell flat on the whole trip, as if the traveller had asked for the overview.
+  const stepStart = useMemo(() => {
+    for (let index = currentStepIndex; index < steps.length; index += 1) {
+      const path = legPath(steps[index].leg);
+      if (path.length) return path[0];
+    }
+    for (let index = currentStepIndex - 1; index >= 0; index -= 1) {
+      const path = legPath(steps[index].leg);
+      if (path.length) return path[path.length - 1];
+    }
+    return null;
+  }, [steps, currentStepIndex]);
+  const followPoint = !overview && !arrived ? here ?? stepStart : null;
+  // Lot 2 (docs/etude-guidage-carte.md): stops or distance left on the current ride, and the map view of the step.
+  const stepLeg = steps[Math.min(currentStepIndex, Math.max(steps.length - 1, 0))]?.leg ?? null;
+  const progress = useMemo(() => (stepLeg ? rideProgress(stepLeg, here) : null), [stepLeg, here]);
+  const countdown = stepLeg && progress ? rideCountdown(stepLeg, progress) : null;
+  const camera = useMemo(() => (stepLeg ? followCamera(stepLeg, progress?.metresLeft ?? null) : null), [stepLeg, progress?.metresLeft]);
   const current = steps[Math.min(currentStepIndex, Math.max(steps.length - 1, 0))];
 
   // Re-evaluates confirmed incidents on this journey whenever reports change.
@@ -159,9 +215,31 @@ export default function NavigationActiveScreen() {
     }
   };
 
+  // The place picked from its sheet, when this trip goes there: on arrival SIRA asks « Tu l'as trouvé ? ».
+  // A yes near the place counts as « trouvé avec SIRA », the strongest proof that the place exists.
+  const targetPlace = lieuViseVers(search?.arrival);
+  const answerFound = async (yes: boolean) => {
+    if (!targetPlace || found !== 'ask') return;
+    setFound('sending');
+    try {
+      try {
+        await repondreEncoreLa(targetPlace.id, yes, yes && here ? here : undefined);
+      } catch (error) {
+        // Too far from the place (arrival by touch, poor GPS): the yes still counts as « encore là ».
+        if (!(yes && here)) throw error;
+        await repondreEncoreLa(targetPlace.id, yes);
+      }
+      setFound(yes ? 'yes' : 'no');
+    } catch (error) {
+      setFound('ask');
+      notify('Envoi impossible', error instanceof Error ? error.message : 'Réessaie dans un instant.');
+    }
+  };
+
   // Arrived: the trip is over, the home map is next (as in Google Maps and Waze).
   const finishTrip = () => {
     setShowRating(false);
+    oublierLieuVise();
     journeyStore.finish();
     void refreshCurrentPlace();
     goHome(router);
@@ -258,6 +336,7 @@ export default function NavigationActiveScreen() {
         subscription = await Location.watchPositionAsync(
           { accuracy: Location.Accuracy.High, distanceInterval: 10, timeInterval: 3000 },
           ({ coords }) => {
+            setHere({ latitude: coords.latitude, longitude: coords.longitude });
             const { steps: all, index, arrived: done, destination, destinationName: place } = latest.current;
             if (done) return;
             const key = `${journeyId}:${index}`;
@@ -266,6 +345,9 @@ export default function NavigationActiveScreen() {
             else if (event?.type === 'arrived') setArrived(true);
             else if (event?.type === 'alight-soon') {
               warned.current.add(key);
+              // Get ready to get off: the phone buzzes as well as speaks (as Citymapper and Transit do).
+              void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
+              if (Platform.OS === 'web') globalThis.navigator?.vibrate?.([200, 100, 200]);
               void say(alightSoonSpeech(all[index].leg), 'alert');
             } else {
               // Nothing changes: maybe a turn just ahead, or halfway on the bus.
@@ -306,8 +388,8 @@ export default function NavigationActiveScreen() {
       <View style={[styles.container, styles.emptyContainer]}>
         <StatusBar style="light" />
         <Ionicons name="navigate-circle" size={54} color="#F26522" />
-        <Text style={styles.exitModalTitle}>Aucun trajet en cours</Text>
-        <TouchableOpacity style={styles.confirmExitBtn} onPress={() => goBack(router)} activeOpacity={0.8}>
+        <Text style={[styles.exitModalTitle, styles.emptyTitle]}>Aucun trajet en cours</Text>
+        <TouchableOpacity style={[styles.confirmExitBtn, styles.emptyButton]} onPress={() => goBack(router)} activeOpacity={0.8}>
           <Text style={styles.confirmExitText}>Retour</Text>
         </TouchableOpacity>
       </View>
@@ -327,6 +409,13 @@ export default function NavigationActiveScreen() {
         destination={search?.arrival}
         routeCoordinates={journeyPath(alternative ?? journey)}
         reports={reports}
+        userPosition={here}
+        mapStyle={mapSettings.style}
+        showBuildings={mapSettings.buildings}
+        follow={followPoint}
+        followPaused={followPaused}
+        followCamera={camera}
+        onFollowPause={pauseFollow}
       />
 
       {/* Overlay Safe Area */}
@@ -345,6 +434,13 @@ export default function NavigationActiveScreen() {
             <View style={styles.hudTextCol}>
               <Text style={styles.hudInstructionText}>{stepTitle(currentLeg)}</Text>
               <Text style={styles.hudSubtext}>Étape {currentStepIndex + 1}/{steps.length} • {stepDescription(currentLeg)}</Text>
+              {/* « Descends dans 3 arrêts », then « Ton arrêt est le prochain » (stop countdown, as in Transit). */}
+              {countdown && (
+                <View style={[styles.countdown, countdown.urgent && styles.countdownUrgent]} accessibilityLiveRegion="polite">
+                  <Ionicons name={countdown.urgent ? 'notifications' : 'flag-outline'} size={14} color={countdown.urgent ? '#FFFFFF' : '#FDBA74'} />
+                  <Text style={[styles.countdownText, countdown.urgent && styles.countdownTextUrgent]}>{countdown.text}</Text>
+                </View>
+              )}
             </View>
             <TouchableOpacity
               onPress={() => setShowExitConfirm(true)}
@@ -395,6 +491,13 @@ export default function NavigationActiveScreen() {
           <TouchableOpacity style={styles.mapControlBtn} activeOpacity={0.8} onPress={() => router.push('/report-event')}>
             <Ionicons name="warning" size={22} color="#EF4444" />
           </TouchableOpacity>
+
+          {!arrived && (
+            <TouchableOpacity style={styles.mapControlBtn} activeOpacity={0.8} onPress={overview ? recenter : showOverview}
+              accessibilityRole="button" accessibilityLabel={overview ? 'Reprendre le suivi, carte penchée' : 'Vue d’ensemble du trajet'}>
+              <Ionicons name={overview ? 'navigate' : 'map-outline'} size={22} color="#F26522" />
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Journey traffic status from confirmed community reports */}
@@ -509,6 +612,21 @@ export default function NavigationActiveScreen() {
               </>
             )}
             {fare.state === 'sent' && <Text style={styles.arrivalSub}>Merci ! Ton prix aide les prochains voyageurs.</Text>}
+            {targetPlace && currentToken() && (found === 'ask' || found === 'sending') && (
+              <>
+                <Text style={styles.arrivalSub}>Tu as trouvé « {targetPlace.nom} » ?</Text>
+                <View style={styles.alternativeButtons}>
+                  <TouchableOpacity style={[styles.confirmExitBtn, styles.arrivalButton]} onPress={() => answerFound(true)} disabled={found === 'sending'} activeOpacity={0.85}>
+                    <Text style={styles.confirmExitText}>Oui, c’est là</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={[styles.cancelExitBtn, styles.arrivalButton]} onPress={() => answerFound(false)} disabled={found === 'sending'} activeOpacity={0.85}>
+                    <Text style={styles.cancelExitText}>Non, pas trouvé</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
+            {found === 'yes' && <Text style={styles.arrivalSub}>Merci ! Ta confirmation aide les prochains voyageurs à y croire.</Text>}
+            {found === 'no' && <Text style={styles.arrivalSub}>C’est noté : si d’autres ne le trouvent pas non plus, le lieu disparaîtra de SIRA.</Text>}
             <TouchableOpacity
               style={[styles.cancelExitBtn, styles.arrivalDone]}
               onPress={() => {
@@ -527,6 +645,15 @@ export default function NavigationActiveScreen() {
         {/* Bottom Navigation Dashboard Card */}
         {!arrived && (
         <View style={styles.bottomDashboardCard}>
+          {/* « Recentrer », just above the card (as in Google Maps): the map follows the traveller again. */}
+          {(followPaused || overview) && (
+            <View style={styles.recenterRow} pointerEvents="box-none">
+              <TouchableOpacity style={styles.recenterPill} onPress={recenter} activeOpacity={0.85} accessibilityRole="button" accessibilityLabel="Recentrer la carte sur moi">
+                <Ionicons name="navigate" size={18} color="#FFFFFF" />
+                <Text style={styles.recenterText}>Recentrer</Text>
+              </TouchableOpacity>
+            </View>
+          )}
           {/* Progress Bar with Milestones */}
           <View style={styles.progressTrackContainer}>
             <View style={styles.progressTrackBg}>
@@ -677,6 +804,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 14,
   },
+  // Light title on the dark screen; the button keeps its own size (confirmExitBtn grows with flex: 1 in a row).
+  emptyTitle: { color: '#FFFFFF' },
+  emptyButton: { flexGrow: 0, flexShrink: 0, flexBasis: 'auto', alignSelf: 'center', paddingHorizontal: 36 },
   liveTrafficBadgeAlert: {
     backgroundColor: '#991B1B',
   },
@@ -913,6 +1043,16 @@ const styles = StyleSheet.create({
     color: '#0F172A',
     lineHeight: 16,
   },
+  countdown: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', marginTop: 6, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, backgroundColor: 'rgba(242, 101, 34, 0.18)' },
+  countdownUrgent: { backgroundColor: '#F26522' },
+  countdownText: { color: '#FDBA74', fontSize: 13.5, fontWeight: '800' },
+  countdownTextUrgent: { color: '#FFFFFF' },
+  recenterRow: { position: 'absolute', top: -60, left: 0, right: 0, alignItems: 'center' },
+  recenterPill: {
+    flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 20, height: 44, borderRadius: 22,
+    backgroundColor: '#F26522', shadowColor: '#000000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.25, shadowRadius: 8, elevation: 6,
+  },
+  recenterText: { color: '#FFFFFF', fontSize: 15, fontWeight: '800' },
   bottomDashboardCard: {
     marginHorizontal: 16,
     marginBottom: Platform.OS === 'ios' ? 10 : 16,
